@@ -1,4 +1,4 @@
-import sheets, { auth } from "../config/db.js";
+import sheets, { auth,updateCell } from "../config/db.js";
 import { PROCESS_MAP } from "../constants/processMap.js";
 import { columnToIndex } from "../helpers/index.js";
 
@@ -11,9 +11,7 @@ const sheetName = "Production_Process";
 export const getProductionOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     auth: await auth.getClient(),
-
     spreadsheetId,
-
     range: `${sheetName}!A:Z`,
   });
 

@@ -2,3 +2,4 @@
 export const columnToIndex = (column) => {
   return column.charCodeAt(0) - 65;
 };
+

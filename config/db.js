@@ -3,8 +3,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 import fs from "fs";
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 
-console.log(fs.existsSync("config/credentials.json"));
 
 export const auth = new google.auth.GoogleAuth({
   keyFile: "credentials.json",
@@ -17,3 +17,17 @@ const sheets = google.sheets({
 });
 
 export default sheets;
+
+export const updateCell = async (cell, value) => {
+  const authClient = await auth.getClient();
+
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.PRODUCTION_SHEET}!${cell}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[value]],
+    },
+  });
+};

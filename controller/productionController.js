@@ -9,7 +9,8 @@ import {
 export const updateProductionProcess = async (req, res) => {
   try {
     const { soNo, product, process, productionQty, updatedBy } = req.body;
-
+    
+    
     await completeProductionProcess({
       soNo,
       product,
