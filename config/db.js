@@ -7,7 +7,7 @@ import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 
 export const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
+  keyFile: "config/credentials.json",
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 

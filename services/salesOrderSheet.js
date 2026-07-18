@@ -1,15 +1,14 @@
 import { auth } from "../config/db.js";
 import sheets from "../config/db.js";
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-const sheetName = "Sales_Order";
-const productionSheetName = "Production_Process";
 
 // Read all orders
 export const getSalesOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A:O`,
+    range: `${SHEET_NAMES.SALES_MASTER}!A:P`,
   });
   return response.data.values || [];
 };
@@ -18,9 +17,9 @@ export const getSalesOrders = async () => {
 export const appendMultipleSalesOrders = async (values) => {
   const auth1 = await auth.getClient();
   await sheets.spreadsheets.values.append({
-   auth: auth1,
-    spreadsheetId:spreadsheetId,
-    range: `${sheetName}!A:G`,
+    auth: auth1,
+    spreadsheetId: spreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!A:G`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
@@ -29,13 +28,11 @@ export const appendMultipleSalesOrders = async (values) => {
   });
 };
 
-
-
-// append sales order data to the production process sheet 
+// append sales order data to the production process sheet
 export const appendSalesOrderToProductionProcess = async (values) => {
   await sheets.spreadsheets.values.append({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${productionSheetName}!A:E`,
+    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:E`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values,
@@ -43,10 +40,9 @@ export const appendSalesOrderToProductionProcess = async (values) => {
   });
 };
 
-
 //  remove sales order by soNo
-export const cancelSalesOrder = async(soNo)=>{
-     const response = await sheets.spreadsheets.values.get({
+export const cancelSalesOrder = async (soNo) => {
+  const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: "Sales_Order!A:H",
   });
@@ -63,7 +59,7 @@ export const cancelSalesOrder = async(soNo)=>{
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `Sales_Order!H${rowNumber}`,
+    range: `${SHEET_NAMES.SALES_MASTER}!H${rowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [["Cancelled"]],
@@ -71,4 +67,4 @@ export const cancelSalesOrder = async(soNo)=>{
   });
 
   return true;
-}
+};

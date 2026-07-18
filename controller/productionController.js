@@ -1,176 +1,549 @@
-import { PROCESS_MAP, PRODUCTION_COLUMNS } from "../constants/processMap.js";
 import {
+  PRODUCTION_COLUMNS,
+} from "../constants/processMap.js";
+
+import {
+  startProductionProcess,
   completeProductionProcess,
   getProductionOrders,
+  getProductionByProcess,
+  updateProductionWastage,
 } from "../services/productionSheet.js";
 
-// Complete Production Process
 
-export const updateProductionProcess = async (req, res) => {
-  try {
-    const { soNo, product, process, productionQty, updatedBy } = req.body;
-    
-    
-    await completeProductionProcess({
-      soNo,
-      product,
-      process,
-      productionQty,
-      updatedBy,
-    });
+// start production process
+export const startProduction =
+  async (req, res) => {
 
-    return res.status(200).json({
-      success: true,
-      message: `${process} Completed Successfully`,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+    try {
 
-// get all production processes
-export const getAllProductionOrders = async (req, res) => {
-  try {
-    const rows = await getProductionOrders();
+      const {
+        soNo,
+        product,
+        process,
+        updatedBy,
+      } = req.body;
 
-    const data = rows.slice(1);
 
-    const productionOrders = data.map((row) => ({
-      soNo: row[0] || "",
-      product: row[1] || "",
-      productionTargetQty: Number(row[2]) || 0,
-      division: row[3] || "",
-      productionQty: Number(row[4]) || 0,
+      if (
+        !soNo ||
+        !product ||
+        !process
+      ) {
 
-      warping: row[5] || "",
-      warpingEndsAt: row[6] || "",
+        return res.status(400).json({
 
-      yarnBeam: row[7] || "",
-      yarnBeamEndsAt: row[8] || "",
+          success: false,
 
-      machine: row[9] || "",
-      machineEndsAt: row[10] || "",
+          message:
+            "SO No, Product and Process are required",
 
-      quality: row[11] || "",
-      qualityEndsAt: row[12] || "",
+        });
 
-      finishing: row[13] || "",
-      finishingEndsAt: row[14] || "",
+      }
 
-      rolling: row[15] || "",
-      rollingEndsAt: row[16] || "",
 
-      packing: row[17] || "",
-      packingEndsAt: row[18] || "",
+      await startProductionProcess({
 
-      status: row[19] || "",
+        soNo,
 
-      wastageQty: Number(row[20]) || 0,
+        product,
 
-      nettQtyRTD: Number(row[21]) || 0,
+        process,
 
-      jobWork: row[22] || "",
-      jobWorkCompletedAt: row[23] || "",
+        updatedBy,
 
-      updatedBy: row[24] || "",
-      updatedTime: row[25] || "",
-    }));
-
-    res.status(200).json({
-      success: true,
-      productionOrders,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// get production by process
-export const getProductionByProcess = async (req, res) => {
-  try {
-    const { process } = req.params;
-console.log("params",process)
-    const rows = await getProductionOrders();
-
-    const data = rows.slice(1);
-    const currentProcess = PROCESS_MAP[process];
-
-    if (!currentProcess) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Process",
       });
+
+
+      return res.status(200).json({
+
+        success: true,
+
+        message:
+          `${process} Started Successfully`,
+
+      });
+
+    } catch (error) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          error.message,
+
+      });
+
     }
 
-   const list = data.filter((row) => {
+  };
 
-  if (row[currentProcess.statusIndex] === "Completed") {
-    return false;
-  }
 
-  if (!currentProcess.previous) {
-    return row[PRODUCTION_COLUMNS.STATUS] !== "Cancelled";
-  }
 
-  const previousProcess =
-    PROCESS_MAP[currentProcess.previous];
+// complete production process
+export const completeProduction =
+  async (req, res) => {
 
-  return (
-    row[previousProcess.statusIndex] === "Completed" &&
-    row[PRODUCTION_COLUMNS.STATUS] !== "Cancelled"
-  );
+    try {
 
-});
+      const {
+        soNo,
+        product,
+        process,
+        productionQty,
+        updatedBy,
+      } = req.body;
 
-    const result = list.map((row) => ({
-      soNo: row[PRODUCTION_COLUMNS.SO_NO],
-      product: row[PRODUCTION_COLUMNS.PRODUCT],
-      productionTargetQty: row[PRODUCTION_COLUMNS.TARGET_QTY],
-      division: row[PRODUCTION_COLUMNS.DIVISION],
-      productionQty: row[PRODUCTION_COLUMNS.PRODUCTION_QTY],
-      status: row[PRODUCTION_COLUMNS.STATUS],
-    }));
 
-    res.status(200).json({
-      success: true,
-      data:result,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+      if (
+        !soNo ||
+        !product ||
+        !process
+      ) {
 
-// update wastage
-export const updateWastage = async (req, res) => {
-  try {
-    const { soNo, product, wastageQty, updatedBy } = req.body;
+        return res.status(400).json({
 
-    await updateProductionWastage({
-      soNo,
-      product,
-      wastageQty,
-      updatedBy,
-    });
+          success: false,
 
-    return res.status(200).json({
-      success: true,
+          message:
+            "SO No, Product and Process are required",
 
-      message: "Wastage Updated",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
+        });
 
-      message: error.message,
-    });
-  }
-};
+      }
+
+
+      await completeProductionProcess({
+
+        soNo,
+
+        product,
+
+        process,
+
+        productionQty,
+
+        updatedBy,
+
+      });
+
+
+      return res.status(200).json({
+
+        success: true,
+
+        message:
+          `${process} Completed Successfully`,
+
+      });
+
+    } catch (error) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          error.message,
+
+      });
+
+    }
+
+  };
+
+
+
+// controller for get all production orders 
+
+export const getAllProductionOrders =
+  async (req, res) => {
+
+    try {
+
+      const rows =
+        await getProductionOrders();
+
+
+      const data =
+        rows.slice(1);
+
+
+      const productionOrders =
+        data.map((row) => ({
+
+          id:
+            `${row[
+              PRODUCTION_COLUMNS.SO_NO
+            ]}-${
+              row[
+                PRODUCTION_COLUMNS.PRODUCT
+              ]
+            }`,
+
+          soNo:
+            row[
+              PRODUCTION_COLUMNS.SO_NO
+            ] || "",
+
+
+          product:
+            row[
+              PRODUCTION_COLUMNS.PRODUCT
+            ] || "",
+
+
+          productionTargetQty:
+            Number(
+              row[
+                PRODUCTION_COLUMNS.TARGET_QTY
+              ]
+            ) || 0,
+
+
+          division:
+            row[
+              PRODUCTION_COLUMNS.DIVISION
+            ] || "",
+
+
+          productionQty:
+            Number(
+              row[
+                PRODUCTION_COLUMNS.PRODUCTION_QTY
+              ]
+            ) || 0,
+
+
+          isJobWork:
+            String(
+              row[
+                PRODUCTION_COLUMNS.JOB_WORK
+              ]
+            ).toLowerCase() === "true",
+
+
+          jobWorkStartTime:
+            row[
+              PRODUCTION_COLUMNS.JOB_WORK_START
+            ] || "",
+
+
+          jobWorkEndTime:
+            row[
+              PRODUCTION_COLUMNS.JOB_WORK_END
+            ] || "",
+
+
+          warpingStartAt:
+            row[
+              PRODUCTION_COLUMNS.WARPING_START
+            ] || "",
+
+
+          warping:
+            row[
+              PRODUCTION_COLUMNS.WARPING
+            ] || "",
+
+
+          warpingEndsAt:
+            row[
+              PRODUCTION_COLUMNS.WARPING_END
+            ] || "",
+
+
+          yarnBeamStartAt:
+            row[
+              PRODUCTION_COLUMNS.YARN_BEAM_START
+            ] || "",
+
+
+          yarnBeam:
+            row[
+              PRODUCTION_COLUMNS.YARN_BEAM
+            ] || "",
+
+
+          yarnBeamEndsAt:
+            row[
+              PRODUCTION_COLUMNS.YARN_BEAM_END
+            ] || "",
+
+
+          machineStartsAt:
+            row[
+              PRODUCTION_COLUMNS.MACHINE_START
+            ] || "",
+
+
+          machine:
+            row[
+              PRODUCTION_COLUMNS.MACHINE
+            ] || "",
+
+
+          machineEndsAt:
+            row[
+              PRODUCTION_COLUMNS.MACHINE_END
+            ] || "",
+
+
+          qualityStartsAt:
+            row[
+              PRODUCTION_COLUMNS.QUALITY_START
+            ] || "",
+
+
+          quality:
+            row[
+              PRODUCTION_COLUMNS.QUALITY
+            ] || "",
+
+
+          qualityEndsAt:
+            row[
+              PRODUCTION_COLUMNS.QUALITY_END
+            ] || "",
+
+
+          finishingStartsAt:
+            row[
+              PRODUCTION_COLUMNS.FINISHING_START
+            ] || "",
+
+
+          finishing:
+            row[
+              PRODUCTION_COLUMNS.FINISHING
+            ] || "",
+
+
+          finishingEndsAt:
+            row[
+              PRODUCTION_COLUMNS.FINISHING_END
+            ] || "",
+
+
+          rollingStartsAt:
+            row[
+              PRODUCTION_COLUMNS.ROLLING_START
+            ] || "",
+
+
+          rolling:
+            row[
+              PRODUCTION_COLUMNS.ROLLING
+            ] || "",
+
+
+          rollingEndsAt:
+            row[
+              PRODUCTION_COLUMNS.ROLLING_END
+            ] || "",
+
+
+          packingStartsAt:
+            row[
+              PRODUCTION_COLUMNS.PACKING_START
+            ] || "",
+
+
+          packing:
+            row[
+              PRODUCTION_COLUMNS.PACKING
+            ] || "",
+
+
+          packingEndsAt:
+            row[
+              PRODUCTION_COLUMNS.PACKING_END
+            ] || "",
+
+
+          status:
+            row[
+              PRODUCTION_COLUMNS.STATUS
+            ] || "",
+
+
+          wastageQty:
+            Number(
+              row[
+                PRODUCTION_COLUMNS.WASTAGE_QTY
+              ]
+            ) || 0,
+
+
+          nettQtyRTD:
+            Number(
+              row[
+                PRODUCTION_COLUMNS.NETT_QTY_RTD
+              ]
+            ) || 0,
+
+
+          updatedBy:
+            row[
+              PRODUCTION_COLUMNS.UPDATED_BY
+            ] || "",
+
+
+          updatedTime:
+            row[
+              PRODUCTION_COLUMNS.UPDATED_TIME
+            ] || "",
+
+        }));
+
+
+      return res.status(200).json({
+
+        success: true,
+
+        productionOrders,
+
+      });
+
+    } catch (error) {
+
+      return res.status(500).json({
+
+        success: false,
+
+        message:
+          error.message,
+
+      });
+
+    }
+
+  };
+
+
+// get production by process controller
+export const getProductionProcess =
+  async (req, res) => {
+
+    try {
+
+      const {
+        process,
+      } = req.params;
+
+
+      if (!process) {
+
+        return res.status(400).json({
+
+          success: false,
+
+          message:
+            "Process is required",
+
+        });
+
+      }
+
+
+      const data =
+        await getProductionByProcess(
+          process
+        );
+
+
+      return res.status(200).json({
+
+        success: true,
+
+        data,
+
+      });
+
+    } catch (error) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          error.message,
+
+      });
+
+    }
+
+  };
+
+
+// controller for update wastage
+export const updateWastage =
+  async (req, res) => {
+
+    try {
+
+      const {
+        soNo,
+        product,
+        wastageQty,
+        updatedBy,
+      } = req.body;
+
+
+      if (
+        !soNo ||
+        !product ||
+        wastageQty ===
+        undefined
+      ) {
+
+        return res.status(400).json({
+
+          success: false,
+
+          message:
+            "SO No, Product and Wastage Qty are required",
+
+        });
+
+      }
+
+
+      await updateProductionWastage({
+
+        soNo,
+
+        product,
+
+        wastageQty,
+
+        updatedBy,
+
+      });
+
+
+      return res.status(200).json({
+
+        success: true,
+
+        message:
+          "Wastage Updated Successfully",
+
+      });
+
+    } catch (error) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          error.message,
+
+      });
+
+    }
+
+  };

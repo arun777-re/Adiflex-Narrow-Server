@@ -15,6 +15,7 @@ export const createSalesOrder = async (req, res) => {
       jobWork,
       orderReceivedBy,
       products,
+      location
     } = req.body;
 
     const rows = await getSalesOrders();
@@ -49,6 +50,7 @@ export const createSalesOrder = async (req, res) => {
         0,
         orderReceivedBy,
         "Pending",
+        location
       ]);
     });
 
@@ -61,9 +63,12 @@ export const createSalesOrder = async (req, res) => {
          item.product,
          productionQty,
          division,
+         "",
+         jobWork
+
       ]);
     });
-console.log("values for production:",productionValues);
+     console.log("values for production:",productionValues);
     await appendMultipleSalesOrders(values);
     await appendSalesOrderToProductionProcess(productionValues);
     return res.status(201).json({
