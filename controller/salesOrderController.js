@@ -3,6 +3,7 @@ import {
   appendMultipleSalesOrders,
   cancelSalesOrder,
   appendSalesOrderToProductionProcess,
+  ALLOWED_DIVISIONS,
 } from "../services/salesOrderSheet.js";
 
 // create sales order
@@ -17,6 +18,54 @@ export const createSalesOrder = async (req, res) => {
       products,
       location
     } = req.body;
+
+
+    // validations
+     if (
+      !date ||
+      !customer ||
+      !division ||
+      !products ||
+      !products.length ||
+      !location
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          "Date, Customer, Division, Products and Location are required",
+
+      });
+
+    }
+
+
+    const normalizedDivision =
+      String(division)
+        .trim()
+        .toLowerCase();
+
+
+    if (
+      !ALLOWED_DIVISIONS.includes(
+        normalizedDivision
+      )
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          "Invalid Division",
+
+      });
+
+    }
+
+
 
     const rows = await getSalesOrders();
 
@@ -68,9 +117,8 @@ export const createSalesOrder = async (req, res) => {
 
       ]);
     });
-     console.log("values for production:",productionValues);
     await appendMultipleSalesOrders(values);
-    await appendSalesOrderToProductionProcess(productionValues);
+    await appendSalesOrderToProductionProcess(productionValues,division);
     return res.status(201).json({
       success: true,
 

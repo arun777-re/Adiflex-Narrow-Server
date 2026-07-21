@@ -6,13 +6,14 @@ import {
   startProduction,
   completeProduction,
   updateWastage,
+  completeQuality
 } from "../controller/productionController.js";
 
 const router = express.Router();
 
 // get all production orders
 router.get(
-  "/",
+  "/getAll/:division",
   getAllProductionOrders
 );
 
@@ -42,5 +43,9 @@ router.patch(
   updateWastage
 );
 
+router.post(
+  "/complete-quality",
+  completeQuality
+);
 
 export default router;

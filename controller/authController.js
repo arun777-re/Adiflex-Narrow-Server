@@ -1,41 +1,187 @@
 import { getUsers } from "../services/googleSheets.js";
 
+
 export const login = async (req, res) => {
+
   try {
-    const {role, password } = req.body;
 
-    const users = await getUsers();
+    const {
+      role,
+      division,
+      password,
+    } = req.body;
 
-    // header remove
-    const rows = users.slice(1);
-   const user = rows.find((row) => {
-  return (
-    row[2]?.trim().toLowerCase() === role.trim().toLowerCase() &&
-    row[3]?.trim() === password.trim() &&
-    (!row[5] || row[5].trim().toLowerCase() === "active")
-  );
-});
-    if (!user) {
-      return res.status(401).json({
+
+    // ==========================================
+    // VALIDATION
+    // ==========================================
+
+    if (
+      !role ||
+      !division ||
+      !password
+    ) {
+
+      return res.status(400).json({
+
         success: false,
-        message: "Invalid Role or Password",
+
+        message:
+          "Role, Division and Password are required",
+
       });
+
     }
 
- return res.status(200).json({
+
+    // ==========================================
+    // GET USERS
+    // ==========================================
+
+    const users =
+      await getUsers();
+
+
+    // Remove header row
+
+    const rows =
+      users.slice(1);
+
+
+    // ==========================================
+    // FIND USER
+    // ==========================================
+
+    const user =
+      rows.find((row) => {
+
+
+        const userRole =
+          String(
+            row[1] || ""
+          )
+            .trim()
+            .toLowerCase();
+
+
+        const userDivision =
+          String(
+            row[2] || ""
+          )
+            .trim()
+            .toLowerCase();
+
+
+        const userPassword =
+          String(
+            row[3] || ""
+          )
+            .trim();
+
+
+        const userStatus =
+          String(
+            row[5] || ""
+          )
+            .trim()
+            .toLowerCase();
+
+
+        return (
+
+          userRole ===
+          role
+            .trim()
+            .toLowerCase()
+
+
+          &&
+
+
+          userDivision ===
+          division
+            .trim()
+            .toLowerCase()
+
+
+          &&
+
+
+          userPassword ===
+          password
+            .trim()
+
+
+          &&
+
+
+          (
+            !userStatus ||
+            userStatus ===
+            "active"
+          )
+
+        );
+
+      });
+
+
+    // ==========================================
+    // INVALID LOGIN
+    // ==========================================
+
+    if (!user) {
+
+      return res.status(401).json({
+
+        success: false,
+
+        message:
+          "Invalid Role, Division or Password",
+
+      });
+
+    }
+
+
+    // ==========================================
+    // SUCCESS
+    // ==========================================
+
+    return res.status(200).json({
+
       success: true,
-      message: "Login Successful",
+
+      message:
+        "Login Successful",
+
       user: {
-        id: user[0],
-        name: user[1],
-        role: user[2],
+
+        name:
+          user[0],
+
+        role:
+          user[1],
+
+        division:
+          user[2],
+
       },
+
     });
 
+
   } catch (error) {
+
     return res.status(500).json({
+
       success: false,
-      message: error.message,
+
+      message:
+        error.message,
+
     });
+
   }
+
 };

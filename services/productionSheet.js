@@ -1,25 +1,30 @@
-import sheets, { updateCell } from "../config/db.js";
+import sheets, { getDatabaseByDivision, updateCell } from "../config/db.js";
 
 import { PROCESS_MAP, PRODUCTION_COLUMNS } from "../constants/processMap.js";
-
-const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
+import { appendDispatch } from "./dispatchSheet.js";
 
 // =====================================================
 // GET PRODUCTION ORDERS
 // =====================================================
 
-export const getProductionOrders = async () => {
+export const getProductionOrders = async (division) => {
+  if (!division) {
+    throw new Error("Division is required");
+  }
+
+  const SPREADSHEET_ID = getDatabaseByDivision(division);
+
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: "Production_Process!A:AH",
+    range: "Production_Process!A1:AH",
   });
 
   return response.data.values || [];
 };
 
 // =====================================================
-// CHECK JOB WORK
+// JOB WORK CHECK
 // =====================================================
 
 const isJobWorkOrder = (row) => {
@@ -41,41 +46,32 @@ const getProcessStatus = (row, process) => {
     throw new Error(`Invalid process: ${process}`);
   }
 
-  // ==========================================
-  // JOB WORK
-  // ==========================================
+  const startTime = row[processMap.timeIndex];
 
-  if (process === "jobWork") {
-    const start = row[PRODUCTION_COLUMNS.JOB_WORK_START] || "";
+  const endTime = row[processMap.endTimeIndex];
 
-    const end = row[PRODUCTION_COLUMNS.JOB_WORK_END] || "";
-
-    if (end) {
-      return "Completed";
-    }
-
-    if (start) {
-      return "In Progress";
-    }
-
-    return "Pending";
-  }
+  const status =
+    processMap.statusIndex !== undefined ? row[processMap.statusIndex] : "";
 
   // ==========================================
-  // OTHER PROCESSES
+  // COMPLETED
   // ==========================================
 
-  const start = row[processMap.timeIndex] || "";
-
-  const end = row[processMap.endTimeIndex] || "";
-
-  if (end) {
+  if (status === "Completed" || endTime) {
     return "Completed";
   }
 
-  if (start) {
+  // ==========================================
+  // STARTED
+  // ==========================================
+
+  if (startTime) {
     return "In Progress";
   }
+
+  // ==========================================
+  // NOT STARTED
+  // ==========================================
 
   return "Pending";
 };
@@ -92,135 +88,49 @@ const getFirstProcess = (row) => {
 // VALIDATE PREVIOUS PROCESS
 // =====================================================
 
-const validatePreviousProcess =
-  (
-    row,
-    process
-  ) => {
+const validatePreviousProcess = (row, process) => {
+  const processMap = PROCESS_MAP[process];
 
-    const processMap =
-      PROCESS_MAP[process];
+  if (!processMap) {
+    throw new Error(`Invalid process: ${process}`);
+  }
 
+  // ==========================================
+  // WARPING
+  // ==========================================
 
-    if (!processMap) {
-
-      throw new Error(
-        `Invalid process: ${process}`
-      );
-
-    }
-
-
-    // =================================================
-    // WARPING SPECIAL CASE
-    // =================================================
-
-    if (
-
-      process ===
-      "warping"
-
-    ) {
-
-
-      // ===============================================
-      // WITHOUT JOB WORK
-      // ===============================================
-
-      if (
-
-        !isJobWorkOrder(row)
-
-      ) {
-
-        // Warping is the first process.
-        // No previous process required.
-
-        return;
-
-      }
-
-
-      // ===============================================
-      // WITH JOB WORK
-      // ===============================================
-
-      const jobWorkStatus =
-        getProcessStatus(
-
-          row,
-
-          "jobWork"
-
-        );
-
-
-      if (
-
-        jobWorkStatus !==
-        "Completed"
-
-      ) {
-
-        throw new Error(
-
-          "jobWork is not completed yet"
-
-        );
-
-      }
-
-
+  if (process === "warping") {
+    // NO JOB WORK
+    if (!isJobWorkOrder(row)) {
       return;
-
     }
 
+    // JOB WORK REQUIRED
+    const jobWorkStatus = getProcessStatus(row, "jobWork");
 
-    // =================================================
-    // OTHER PROCESSES
-    // =================================================
-
-    const previousProcess =
-      processMap.previous;
-
-
-    if (
-
-      !previousProcess
-
-    ) {
-
-      return;
-
+    if (jobWorkStatus !== "Completed") {
+      throw new Error("Job Work must be completed before Warping");
     }
 
+    return;
+  }
 
-    const previousStatus =
-      getProcessStatus(
+  // ==========================================
+  // OTHER PROCESSES
+  // ==========================================
 
-        row,
+  const previousProcess = processMap.previous;
 
-        previousProcess
+  if (!previousProcess) {
+    return;
+  }
 
-      );
+  const previousStatus = getProcessStatus(row, previousProcess);
 
-
-    if (
-
-      previousStatus !==
-      "Completed"
-
-    ) {
-
-      throw new Error(
-
-        `${previousProcess} is not completed yet`
-
-      );
-
-    }
-
-  };
+  if (previousStatus !== "Completed") {
+    throw new Error(`${previousProcess} must be completed first`);
+  }
+};
 
 // =====================================================
 // FIND PRODUCTION ORDER
@@ -240,8 +150,8 @@ const findProductionOrder = (rows, soNo, product) => {
   return {
     index,
 
-    // Header row = row 1
-    // Data index 1 = Sheet row 2
+    // Header row = 1
+    // Array index 1 = Sheet row 2
     rowNumber: index + 1,
 
     row: rows[index],
@@ -254,26 +164,14 @@ const findProductionOrder = (rows, soNo, product) => {
 
 export const startProductionProcess = async ({
   soNo,
-
   product,
-
   process,
-
   updatedBy,
+  division,
 }) => {
-  const rows = await getProductionOrders();
+  const rows = await getProductionOrders(division);
 
-  const {
-    rowNumber,
-
-    row,
-  } = findProductionOrder(
-    rows,
-
-    soNo,
-
-    product,
-  );
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
 
   const processMap = PROCESS_MAP[process];
 
@@ -281,42 +179,36 @@ export const startProductionProcess = async ({
     throw new Error(`Invalid process: ${process}`);
   }
 
-  // ==========================================
-  // PREVIOUS PROCESS VALIDATION
-  // ==========================================
-  console.log("========== DEBUG WARPING ==========");
-
-  console.log("SO NO:", soNo);
-  console.log("PRODUCT:", product);
+  console.log("SO:", row[PRODUCTION_COLUMNS.SO_NO]);
 
   console.log("JOB WORK INDEX:", PRODUCTION_COLUMNS.JOB_WORK);
 
-  console.log("JOB WORK RAW VALUE:", row[PRODUCTION_COLUMNS.JOB_WORK]);
+  console.log("JOB WORK RAW:", row[PRODUCTION_COLUMNS.JOB_WORK]);
 
-  console.log("JOB WORK START:", row[PRODUCTION_COLUMNS.JOB_WORK_START]);
+  console.log("JOB WORK BOOLEAN:", isJobWorkOrder(row));
+  // =====================================================
+  // JOB WORK VALIDATION
+  // =====================================================
 
-  console.log("JOB WORK END:", row[PRODUCTION_COLUMNS.JOB_WORK_END]);
+  if (process === "jobWork" && !isJobWorkOrder(row)) {
+    throw new Error("Job Work is not applicable for this order");
+  }
 
-  console.log("IS JOB WORK:", isJobWorkOrder(row));
+  // =====================================================
+  // PREVIOUS PROCESS VALIDATION
+  // =====================================================
 
-  console.log("FULL ROW:", row);
+  validatePreviousProcess(row, process);
 
-  console.log("====================================");
-  validatePreviousProcess(
-    row,
-
-    process,
-  );
-
-  // ==========================================
+  // =====================================================
   // CURRENT STATUS
-  // ==========================================
+  // =====================================================
 
-  const currentStatus = getProcessStatus(
-    row,
+  const currentStatus = getProcessStatus(row, process);
 
-    process,
-  );
+  console.log("PROCESS:", process);
+
+  console.log("CURRENT STATUS:", currentStatus);
 
   if (currentStatus === "Completed") {
     throw new Error(`${process} is already completed`);
@@ -328,35 +220,41 @@ export const startProductionProcess = async ({
 
   const now = new Date().toLocaleString();
 
-  // ==========================================
+  // =====================================================
   // START TIME
-  // ==========================================
+  // =====================================================
 
-  await updateCell(
-    `${processMap.time}${rowNumber}`,
+  await updateCell({
+    division,
 
-    now,
-  );
+    range: `${processMap.time}${rowNumber}`,
 
-  // ==========================================
+    value: now,
+  });
+
+  // =====================================================
   // UPDATED BY
-  // ==========================================
+  // =====================================================
 
-  await updateCell(
-    `AG${rowNumber}`,
+  await updateCell({
+    division,
 
-    updatedBy || "",
-  );
+    range: `AG${rowNumber}`,
 
-  // ==========================================
+    value: updatedBy || "",
+  });
+
+  // =====================================================
   // UPDATED TIME
-  // ==========================================
+  // =====================================================
 
-  await updateCell(
-    `AH${rowNumber}`,
+  await updateCell({
+    division,
 
-    now,
-  );
+    range: `AH${rowNumber}`,
+
+    value: now,
+  });
 
   return true;
 };
@@ -375,20 +273,12 @@ export const completeProductionProcess = async ({
   productionQty,
 
   updatedBy,
+
+  division,
 }) => {
-  const rows = await getProductionOrders();
+  const rows = await getProductionOrders(division);
 
-  const {
-    rowNumber,
-
-    row,
-  } = findProductionOrder(
-    rows,
-
-    soNo,
-
-    product,
-  );
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
 
   const processMap = PROCESS_MAP[process];
 
@@ -396,25 +286,11 @@ export const completeProductionProcess = async ({
     throw new Error(`Invalid process: ${process}`);
   }
 
-  // ==========================================
-  // PREVIOUS PROCESS VALIDATION
-  // ==========================================
+  // PREVIOUS PROCESS
+  validatePreviousProcess(row, process);
 
-  validatePreviousProcess(
-    row,
-
-    process,
-  );
-
-  // ==========================================
-  // CURRENT PROCESS STATUS
-  // ==========================================
-
-  const currentStatus = getProcessStatus(
-    row,
-
-    process,
-  );
+  // CURRENT STATUS
+  const currentStatus = getProcessStatus(row, process);
 
   if (currentStatus === "Pending") {
     throw new Error("Process must be started first");
@@ -424,16 +300,10 @@ export const completeProductionProcess = async ({
     throw new Error(`${process} is already completed`);
   }
 
-  // ==========================================
   // FIRST PROCESS
-  // ==========================================
-
   const firstProcess = getFirstProcess(row);
 
-  // ==========================================
   // PRODUCTION QTY
-  // ==========================================
-
   if (process === firstProcess) {
     if (
       productionQty === undefined ||
@@ -449,78 +319,236 @@ export const completeProductionProcess = async ({
       throw new Error("Production Qty must be greater than 0");
     }
 
-    await updateCell(
-      `E${rowNumber}`,
+    await updateCell({
+      division,
 
-      qty,
-    );
+      range: `E${rowNumber}`,
+
+      value: qty,
+    });
   }
 
   const now = new Date().toLocaleString();
 
-  // ==========================================
   // END TIME
-  // ==========================================
+  await updateCell({
+    division,
 
-  await updateCell(
-    `${processMap.endTime}${rowNumber}`,
+    range: `${processMap.endTime}${rowNumber}`,
 
-    now,
-  );
+    value: now,
+  });
 
-  // ==========================================
-  // PROCESS STATUS
-  // ==========================================
-
+  // STATUS
   if (processMap.status) {
-    await updateCell(
-      `${processMap.status}${rowNumber}`,
-
-      "Completed",
-    );
+    await updateCell({
+      division,
+       range: `${processMap.status}${rowNumber}`,
+       value: "Completed",
+    });
   }
 
-  // ==========================================
   // UPDATED BY
-  // ==========================================
+  await updateCell({
+    division,
 
-  await updateCell(
-    `AG${rowNumber}`,
+    range: `AG${rowNumber}`,
 
-    updatedBy || "",
-  );
+    value: updatedBy || "",
+  });
 
-  // ==========================================
   // UPDATED TIME
-  // ==========================================
+  await updateCell({
+    division,
 
-  await updateCell(
-    `AH${rowNumber}`,
+    range: `AH${rowNumber}`,
 
-    now,
-  );
+    value: now,
+  });
 
-  // ==========================================
   // PACKING COMPLETED
-  // ==========================================
-
   if (process === "packing") {
-    await updateCell(
-      `AD${rowNumber}`,
+    await updateCell({
+      division,
+      range: `AD${rowNumber}`,
+      value: "Ready To Dispatch",
+    });
 
-      "Ready To Dispatch",
+    const finalProductionQty = Number(
+      process === firstProcess
+        ? productionQty
+        : row[PRODUCTION_COLUMNS.PRODUCTION_QTY] || 0,
     );
+
+    const wastageQty = Number(row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0);
+
+    const nettQtyRTD = finalProductionQty - wastageQty;
+
+    await appendDispatch({
+      values: [
+        soNo, // A
+        product, // B
+        division, // C
+        finalProductionQty, // D
+        wastageQty, // E
+        nettQtyRTD, // F
+        0, // G Dispatch Qty
+        nettQtyRTD, // H Available Qty
+        "Ready To Dispatch", // I
+        now, // J Created At
+        now, // K Updated At
+      ],
+    });
   }
 
   return true;
 };
 
 // =====================================================
+// COMPLETE QUALITY + WASTAGE
+// =====================================================
+
+export const completeQualityWithWastage = async ({
+  soNo,
+
+  product,
+
+  wastageQty,
+
+  updatedBy,
+
+  division,
+}) => {
+  const rows = await getProductionOrders(division);
+
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
+
+  const qualityStatus = getProcessStatus(row, "quality");
+
+  if (qualityStatus === "Pending") {
+    throw new Error("Quality process must be started first");
+  }
+
+  if (qualityStatus === "Completed") {
+    throw new Error("Quality process is already completed");
+  }
+
+  const productionQty = Number(row[PRODUCTION_COLUMNS.PRODUCTION_QTY]) || 0;
+
+  if (productionQty <= 0) {
+    throw new Error("Production Qty is not available");
+  }
+
+  if (wastageQty === undefined || wastageQty === null || wastageQty === "") {
+    throw new Error("Wastage Qty is required");
+  }
+
+  const wastage = Number(wastageQty);
+
+  if (Number.isNaN(wastage)) {
+    throw new Error("Wastage Qty must be a valid number");
+  }
+
+  if (wastage < 0) {
+    throw new Error("Wastage Qty cannot be negative");
+  }
+
+  if (wastage > productionQty) {
+    throw new Error("Wastage cannot be greater than Production Qty");
+  }
+
+  const nettQtyRTD = productionQty - wastage;
+
+  const now = new Date().toLocaleString();
+
+  // QUALITY END
+  await updateCell({
+    division,
+
+    range: `T${rowNumber}`,
+
+    value: now,
+  });
+
+  // QUALITY STATUS
+  await updateCell({
+    division,
+
+    range: `S${rowNumber}`,
+
+    value: "Completed",
+  });
+
+  // WASTAGE
+  await updateCell({
+    division,
+
+    range: `AE${rowNumber}`,
+
+    value: wastage,
+  });
+
+  // NETT QTY RTD
+  await updateCell({
+    division,
+
+    range: `AF${rowNumber}`,
+
+    value: nettQtyRTD,
+  });
+
+  // UPDATED BY
+  await updateCell({
+    division,
+
+    range: `AG${rowNumber}`,
+
+    value: updatedBy || "",
+  });
+
+  // UPDATED TIME
+  await updateCell({
+    division,
+
+    range: `AH${rowNumber}`,
+
+    value: now,
+  });
+
+  return {
+    wastageQty: wastage,
+
+    nettQtyRTD,
+  };
+};
+
+// =====================================================
+// WASTAGE PENDING
+// =====================================================
+
+const isWastagePendingAfterQuality = (row) => {
+  const wastageQty = row[PRODUCTION_COLUMNS.WASTAGE_QTY];
+
+  const nettQtyRTD = row[PRODUCTION_COLUMNS.NETT_QTY_RTD];
+
+  return (
+    wastageQty === undefined ||
+    wastageQty === "" ||
+    nettQtyRTD === undefined ||
+    nettQtyRTD === ""
+  );
+};
+
+// =====================================================
 // GET PRODUCTION BY PROCESS
 // =====================================================
 
-export const getProductionByProcess = async (process) => {
-  const rows = await getProductionOrders();
+export const getProductionByProcess = async (
+  process,
+
+  division,
+) => {
+  const rows = await getProductionOrders(division);
 
   const data = rows.slice(1);
 
@@ -531,75 +559,58 @@ export const getProductionByProcess = async (process) => {
   }
 
   const list = data.filter((row) => {
-    // ==========================================
-    // CANCELLED ORDER
-    // ==========================================
-
+    // CANCELLED
     if (
       String(row[PRODUCTION_COLUMNS.STATUS] || "").toLowerCase() === "cancelled"
     ) {
       return false;
     }
 
-    // ==========================================
     // JOB WORK
-    // ==========================================
-
     if (process === "jobWork") {
       return (
-        isJobWorkOrder(row) &&
-        getProcessStatus(
-          row,
-
-          "jobWork",
-        ) !== "Completed"
+        isJobWorkOrder(row) && getProcessStatus(row, "jobWork") !== "Completed"
       );
     }
 
-    // ==========================================
     // WARPING
-    // ==========================================
-
     if (process === "warping") {
-      // Already completed
-      if (
-        getProcessStatus(
-          row,
+      const status = getProcessStatus(row, "warping");
 
-          "warping",
-        ) === "Completed"
-      ) {
+      if (status === "Completed") {
         return false;
       }
 
-      // Job Work order:
-      // Job Work must be completed first
-
       if (isJobWorkOrder(row)) {
-        return (
-          getProcessStatus(
-            row,
-
-            "jobWork",
-          ) === "Completed"
-        );
+        return getProcessStatus(row, "jobWork") === "Completed";
       }
 
-      // Normal order
       return true;
     }
 
-    // ==========================================
+    // QUALITY
+    if (process === "quality") {
+      return (
+        getProcessStatus(row, "quality") !== "Completed" &&
+        getProcessStatus(row, "machine") === "Completed"
+      );
+    }
+
+    // FINISHING
+    if (process === "finishing") {
+      if (getProcessStatus(row, "quality") !== "Completed") {
+        return false;
+      }
+
+      if (isWastagePendingAfterQuality(row)) {
+        return false;
+      }
+
+      return getProcessStatus(row, "finishing") !== "Completed";
+    }
+
     // OTHER PROCESSES
-    // ==========================================
-
-    if (
-      getProcessStatus(
-        row,
-
-        process,
-      ) === "Completed"
-    ) {
+    if (getProcessStatus(row, process) === "Completed") {
       return false;
     }
 
@@ -609,13 +620,7 @@ export const getProductionByProcess = async (process) => {
       return true;
     }
 
-    return (
-      getProcessStatus(
-        row,
-
-        previousProcess,
-      ) === "Completed"
-    );
+    return getProcessStatus(row, previousProcess) === "Completed";
   });
 
   return list.map((row) => ({
@@ -633,21 +638,15 @@ export const getProductionByProcess = async (process) => {
 
     isJobWork: isJobWorkOrder(row),
 
-    processStartTime:
-      process === "jobWork"
-        ? row[PRODUCTION_COLUMNS.JOB_WORK_START] || ""
-        : row[currentProcess.timeIndex] || "",
+    processStatus: getProcessStatus(row, process),
 
-    processEndTime:
-      process === "jobWork"
-        ? row[PRODUCTION_COLUMNS.JOB_WORK_END] || ""
-        : row[currentProcess.endTimeIndex] || "",
+    processStartTime: row[currentProcess.startIndex] || "",
 
-    processStatus: getProcessStatus(
-      row,
+    processEndTime: row[currentProcess.endIndex] || "",
 
-      process,
-    ),
+    wastageQty: row[PRODUCTION_COLUMNS.WASTAGE_QTY] || "",
+
+    nettQtyRTD: row[PRODUCTION_COLUMNS.NETT_QTY_RTD] || "",
   }));
 };
 
@@ -663,27 +662,29 @@ export const updateProductionWastage = async ({
   wastageQty,
 
   updatedBy,
+
+  division,
 }) => {
-  const rows = await getProductionOrders();
+  const rows = await getProductionOrders(division);
 
-  const {
-    rowNumber,
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
 
-    row,
-  } = findProductionOrder(
-    rows,
+  const qualityStatus = getProcessStatus(row, "quality");
 
-    soNo,
-
-    product,
-  );
+  if (qualityStatus !== "Completed") {
+    throw new Error("Quality process must be completed first");
+  }
 
   const productionQty = Number(row[PRODUCTION_COLUMNS.PRODUCTION_QTY]) || 0;
 
   const wastage = Number(wastageQty);
 
-  if (Number.isNaN(wastage) || wastage < 0) {
-    throw new Error("Wastage quantity cannot be negative");
+  if (Number.isNaN(wastage)) {
+    throw new Error("Wastage Qty must be a valid number");
+  }
+
+  if (wastage < 0) {
+    throw new Error("Wastage Qty cannot be negative");
   }
 
   if (wastage > productionQty) {
@@ -694,29 +695,41 @@ export const updateProductionWastage = async ({
 
   const now = new Date().toLocaleString();
 
-  await updateCell(
-    `AE${rowNumber}`,
+  await updateCell({
+    division,
 
-    wastage,
-  );
+    range: `AE${rowNumber}`,
 
-  await updateCell(
-    `AF${rowNumber}`,
+    value: wastage,
+  });
+
+  await updateCell({
+    division,
+
+    range: `AF${rowNumber}`,
+
+    value: nettQtyRTD,
+  });
+
+  await updateCell({
+    division,
+
+    range: `AG${rowNumber}`,
+
+    value: updatedBy || "",
+  });
+
+  await updateCell({
+    division,
+
+    range: `AH${rowNumber}`,
+
+    value: now,
+  });
+
+  return {
+    wastageQty: wastage,
 
     nettQtyRTD,
-  );
-
-  await updateCell(
-    `AG${rowNumber}`,
-
-    updatedBy || "",
-  );
-
-  await updateCell(
-    `AH${rowNumber}`,
-
-    now,
-  );
-
-  return true;
+  };
 };
