@@ -118,7 +118,7 @@ export const appendSalesOrderToProductionProcess =
 
       auth: authClient,
 
-      spreadsheetId,
+      spreadsheetId:process.env.WOVEN_DATABASE_ID,
 
       range:
         `${SHEET_NAMES.PRODUCTION_SHEET}!A:F`,
