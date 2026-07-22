@@ -16,7 +16,11 @@ app.use(express.json());
 app.use(cors(
 
 ));
-
+console.log({
+  GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID,
+  WOVEN_DATABASE_ID: process.env.WOVEN_DATABASE_ID,
+  CROCHET_DATABASE_ID: process.env.CROCHET_DATABASE_ID,
+});
 // Routes
 
 app.use('/auth', authRoutes);
