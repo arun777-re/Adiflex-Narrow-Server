@@ -118,7 +118,7 @@ export const createSalesOrder = async (req, res) => {
       ]);
     });
     await appendMultipleSalesOrders(values);
-    await appendSalesOrderToProductionProcess(productionValues,division);
+    await appendSalesOrderToProductionProcess(productionValues,normalizedDivision);
     return res.status(201).json({
       success: true,
 
