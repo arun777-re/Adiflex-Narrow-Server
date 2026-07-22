@@ -17,7 +17,7 @@ export const getProductionOrders = async (division) => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: "Production_Process!A1:AH",
+    range: "Production_Process!A1:AJ",
   });
 
   return response.data.values || [];
@@ -233,7 +233,7 @@ export const startProductionProcess = async ({
   await updateCell({
     division,
 
-    range: `AG${rowNumber}`,
+    range: `AI${rowNumber}`,
 
     value: updatedBy || "",
   });
@@ -245,7 +245,7 @@ export const startProductionProcess = async ({
   await updateCell({
     division,
 
-    range: `AH${rowNumber}`,
+    range: `AJ${rowNumber}`,
 
     value: now,
   });
@@ -316,7 +316,7 @@ export const completeProductionProcess = async ({
     await updateCell({
       division,
 
-      range: `E${rowNumber}`,
+      range: `G${rowNumber}`,
 
       value: qty,
     });
@@ -346,7 +346,7 @@ export const completeProductionProcess = async ({
   await updateCell({
     division,
 
-    range: `AG${rowNumber}`,
+    range: `AI${rowNumber}`,
 
     value: updatedBy || "",
   });
@@ -355,7 +355,7 @@ export const completeProductionProcess = async ({
   await updateCell({
     division,
 
-    range: `AH${rowNumber}`,
+    range: `AJ${rowNumber}`,
 
     value: now,
   });
@@ -364,7 +364,7 @@ export const completeProductionProcess = async ({
   if (process === "packing") {
     await updateCell({
       division,
-      range: `AD${rowNumber}`,
+      range: `AG${rowNumber}`,
       value: "Ready To Dispatch",
     });
 
@@ -459,7 +459,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `T${rowNumber}`,
+    range: `V${rowNumber}`,
 
     value: now,
   });
@@ -468,7 +468,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `S${rowNumber}`,
+    range: `U${rowNumber}`,
 
     value: "Completed",
   });
@@ -477,7 +477,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `AE${rowNumber}`,
+    range: `W${rowNumber}`,
 
     value: wastage,
   });
@@ -486,7 +486,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `AF${rowNumber}`,
+    range: `AH${rowNumber}`,
 
     value: nettQtyRTD,
   });
@@ -495,7 +495,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `AG${rowNumber}`,
+    range: `AI${rowNumber}`,
 
     value: updatedBy || "",
   });
@@ -504,7 +504,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `AH${rowNumber}`,
+    range: `AJ${rowNumber}`,
 
     value: now,
   });
@@ -634,9 +634,9 @@ export const getProductionByProcess = async (
 
     processStatus: getProcessStatus(row, process),
 
-    processStartTime: row[currentProcess.startIndex] || "",
+    processStartTime: row[currentProcess.timeIndex] || "",
 
-    processEndTime: row[currentProcess.endIndex] || "",
+    processEndTime: row[currentProcess.endTimeIndex] || "",
 
     wastageQty: row[PRODUCTION_COLUMNS.WASTAGE_QTY] || "",
 

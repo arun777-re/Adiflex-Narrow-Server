@@ -150,7 +150,7 @@ export const PROCESS_MAP = {
 
     time: "N",
 
-    endTime: "O",
+    endTime: "P",
 
     statusIndex:
       PRODUCTION_COLUMNS.YARN_BEAM,

@@ -52,7 +52,6 @@ export const startProduction = async (req, res) => {
 export const completeProduction = async (req, res) => {
   try {
     const { soNo, product, process, productionQty, updatedBy,division } = req.body;
-    console.log("req body:",req.body)
 
     if (!soNo || !product || !process || !division) {
       return res.status(400).json({

@@ -11,7 +11,6 @@ const processingRequests = new Set();
 // create sales order
 export const createSalesOrder = async (req, res) => {
   try {
-    console.log("Req.body",req.body);
     const {
       date,
       customer,
@@ -153,29 +152,31 @@ export const getAllSalesOrders = async (req, res) => {
     const orders = data.map((row) => ({
       soNo: row[0] || "",
       date: row[1] || "",
-      customer: row[2] || "",
-      product: row[3] || "",
+      skucode: row[2] || "",
+      customer: row[3] || "",
+      product: row[4] || "",
+      ordertype: row[5] || "",
 
-      division: row[4] || "",
+      division: row[6] || "",
 
-      qty: Number(row[5]) || 0,
+      qty: Number(row[7]) || 0,
 
-      rate: Number(row[6]) || 0,
+      rate: Number(row[8]) || 0,
 
-      unit: row[7] || "",
+      unit: row[9] || "",
 
-      openingFgQty: Number(row[8]) || 0,
+      openingFgQty: Number(row[10]) || 0,
 
-      productionQty: Number(row[9]) || 0,
+      productionQty: Number(row[11]) || 0,
 
-      jobWork: row[10] === true || row[10] === "TRUE",
-      manufacturedQty: Number(row[11]) || 0,
+      jobWork: row[12] === true || row[12] === "TRUE",
+      manufacturedQty: Number(row[13]) || 0,
 
-      dispatchedQty: Number(row[12]) || 0,
+      dispatchedQty: Number(row[14]) || 0,
 
-      orderReceivedBy: row[13] || "",
+      orderReceivedBy: row[15] || "",
 
-      status: row[14] || "",
+      status: row[16] || "",
     }));
 
     return res.status(200).json({

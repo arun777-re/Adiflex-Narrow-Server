@@ -13,7 +13,7 @@ export const appendDispatch = async ({values}) => {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: "Dispatch!A:K",
+    range: "Dispatch_Sheets!A:K",
 
     valueInputOption: "USER_ENTERED",
 
