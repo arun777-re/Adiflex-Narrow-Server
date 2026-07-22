@@ -5,6 +5,8 @@ import { SHEET_NAMES } from "../constants/sheetNames.js";
 const salesOrderSpreadsheetId =
   process.env.GOOGLE_SHEET_ID;
 
+  const WOVEN_SHEET_ID=process.env.WOVEN_DATABASE_ID;
+
   export const ALLOWED_DIVISIONS = [
     "woven",
     "crochet"
@@ -118,7 +120,7 @@ export const appendSalesOrderToProductionProcess =
 
       auth: authClient,
 
-      spreadsheetId:process.env.WOVEN_DATABASE_ID,
+      spreadsheetId:WOVEN_SHEET_ID,
 
       range:
         `${SHEET_NAMES.PRODUCTION_SHEET}!A:F`,
