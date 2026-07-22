@@ -1,7 +1,5 @@
 import { google } from "googleapis";
-import dotenv from "dotenv";
 
-dotenv.config();
 import fs from "fs";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
