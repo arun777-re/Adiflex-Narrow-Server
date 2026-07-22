@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config()
 import { auth, getDatabaseByDivision } from "../config/db.js";
 import sheets from "../config/db.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
