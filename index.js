@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import express from 'express';
 import cors from 'cors';
+import morgan from 'morgan';
 import authRoutes from './routes/authRoutes.js';
 import salesOrderRoutes from './routes/salesOrderRoutes.js';
 import productionRoutes from './routes/productionRoutes.js';
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use(cors(
 
 ));
+app.use(morgan("combined"))
 console.log({
   GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID,
   WOVEN_DATABASE_ID: process.env.WOVEN_DATABASE_ID,
