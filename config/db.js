@@ -12,7 +12,7 @@ export const DATABASES = {
 };
 
 export const auth = new google.auth.GoogleAuth({
-  keyFile: "config/redentials.json",
+  keyFile: "credentials.json",
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 

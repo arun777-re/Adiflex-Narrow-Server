@@ -8,6 +8,8 @@ import {
 
 // create sales order
 export const createSalesOrder = async (req, res) => {
+  console.log("====== CREATE SALES ORDER ======");
+  console.log(req.body);
   try {
     const {
       date,
