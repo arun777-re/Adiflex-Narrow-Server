@@ -82,7 +82,6 @@ export const appendSalesOrderToProductionProcess =
     division
   ) => {
 
-    console.log("HII i am in sales Order");
 
     if (
       !division
@@ -100,7 +99,6 @@ export const appendSalesOrderToProductionProcess =
         division
       );
 
-console.log("spreadSheetID bhaiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:",spreadsheetId);
     if (
       !spreadsheetId
     ) {

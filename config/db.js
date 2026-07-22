@@ -30,6 +30,8 @@ export const getDatabaseByDivision = (division)=>{
   }
 
   const normalizedDivision = String(division).trim().toUpperCase();
+   console.log("Normalized:", normalizedDivision);
+  console.log("Spreadsheet:", DATABASES[normalizedDivision]);
   const spreadsheetID= DATABASES[normalizedDivision];
   if(!spreadsheetID){
     throw new Error(`No database configured for division:${division}`);
