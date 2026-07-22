@@ -97,20 +97,20 @@ export const appendSalesOrderToProductionProcess =
     }
 
 
-    // const spreadsheetId =
-    //   getDatabaseByDivision(
-    //     division
-    //   );
+    const spreadsheetId =
+      getDatabaseByDivision(
+        division
+      );
 
-    // if (
-    //   !spreadsheetId
-    // ) {
+    if (
+      !spreadsheetId
+    ) {
 
-    //   throw new Error(
-    //     `No database configured for division: ${division}`
-    //   );
+      throw new Error(
+        `No database configured for division: ${division}`
+      );
 
-    // }
+    }
 
 
     const authClient =
@@ -121,7 +121,7 @@ export const appendSalesOrderToProductionProcess =
 
       auth: authClient,
 
-      spreadsheetId: WOVEN_SHEET_ID,
+      spreadsheetId: spreadsheetId,
 
       range:
         `${SHEET_NAMES.PRODUCTION_SHEET}!A:F`,
