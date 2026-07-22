@@ -22,7 +22,10 @@ console.log({
   CROCHET_DATABASE_ID: process.env.CROCHET_DATABASE_ID,
 });
 // Routes
-
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.originalUrl}`);
+  next();
+});
 app.use('/auth', authRoutes);
 app.use('/sales-orders', salesOrderRoutes);
 app.use('/production', productionRoutes);
