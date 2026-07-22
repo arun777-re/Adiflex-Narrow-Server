@@ -120,7 +120,7 @@ export const appendSalesOrderToProductionProcess =
 
       auth: authClient,
 
-      spreadsheetId:WOVEN_SHEET_ID,
+      spreadsheetId:WOVEN_SHEET_ID.length > 0 ? WOVEN_SHEET_ID : "",
 
       range:
         `${SHEET_NAMES.PRODUCTION_SHEET}!A:F`,
