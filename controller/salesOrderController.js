@@ -6,10 +6,10 @@ import {
   ALLOWED_DIVISIONS,
 } from "../services/salesOrderSheet.js";
 
+const processingRequests = new Set();
+
 // create sales order
 export const createSalesOrder = async (req, res) => {
-  console.log("====== CREATE SALES ORDER ======");
-  console.log(req.body);
   try {
     const {
       date,
@@ -18,12 +18,11 @@ export const createSalesOrder = async (req, res) => {
       jobWork,
       orderReceivedBy,
       products,
-      location
+      location,
     } = req.body;
 
-
     // validations
-     if (
+    if (
       !date ||
       !customer ||
       !division ||
@@ -31,43 +30,40 @@ export const createSalesOrder = async (req, res) => {
       !products.length ||
       !location
     ) {
-
       return res.status(400).json({
-
         success: false,
 
-        message:
-          "Date, Customer, Division, Products and Location are required",
-
+        message: "Date, Customer, Division, Products and Location are required",
       });
+    }
+    // deduplications
 
+    const requestKey = JSON.stringify({
+      date,
+      customer,
+      division,
+      location,
+      products,
+    });
+
+    if (processingRequests.has(requestKey)) {
+      return res.status(409).json({
+        success: false,
+        message: "Sales Order is already being processed",
+      });
     }
 
+    processingRequests.add(requestKey);
 
-    const normalizedDivision =
-      String(division)
-        .trim()
-        .toLowerCase();
+    const normalizedDivision = String(division).trim().toLowerCase();
 
-
-    if (
-      !ALLOWED_DIVISIONS.includes(
-        normalizedDivision
-      )
-    ) {
-
+    if (!ALLOWED_DIVISIONS.includes(normalizedDivision)) {
       return res.status(400).json({
-
         success: false,
 
-        message:
-          "Invalid Division",
-
+        message: "Invalid Division",
       });
-
     }
-
-
 
     const rows = await getSalesOrders();
 
@@ -101,26 +97,28 @@ export const createSalesOrder = async (req, res) => {
         0,
         orderReceivedBy,
         "Pending",
-        location
+        location,
       ]);
     });
 
-    // values for production state 
+    // values for production state
     const productionValues = [];
     products.forEach((item) => {
-       const productionQty = Number(item.qty) - Number(item.openingFgQty);
+      const productionQty = Number(item.qty) - Number(item.openingFgQty);
       productionValues.push([
-         soNo,
-         item.product,
-         productionQty,
-         division,
-         "",
-         jobWork
-
+        soNo,
+        item.product,
+        productionQty,
+        division,
+        "",
+        jobWork,
       ]);
     });
     await appendMultipleSalesOrders(values);
-    await appendSalesOrderToProductionProcess(productionValues,normalizedDivision);
+    await appendSalesOrderToProductionProcess(
+      productionValues,
+      normalizedDivision,
+    );
     return res.status(201).json({
       success: true,
 
@@ -134,6 +132,8 @@ export const createSalesOrder = async (req, res) => {
 
       message: error.message,
     });
+  }finally{
+     processingRequests.delete(requestKey);
   }
 };
 
@@ -144,33 +144,33 @@ export const getAllSalesOrders = async (req, res) => {
 
     // Header remove
     const data = rows.slice(1);
-   const orders = data.map((row) => ({
-  soNo: row[0] || "",
-  date: row[1] || "",
-  customer: row[2] || "",
-  product: row[3] || "",
+    const orders = data.map((row) => ({
+      soNo: row[0] || "",
+      date: row[1] || "",
+      customer: row[2] || "",
+      product: row[3] || "",
 
-  division: row[4] || "",
+      division: row[4] || "",
 
-  qty: Number(row[5]) || 0,
+      qty: Number(row[5]) || 0,
 
-  rate: Number(row[6]) || 0,
+      rate: Number(row[6]) || 0,
 
-  unit: row[7] || "",
+      unit: row[7] || "",
 
-  openingFgQty: Number(row[8]) || 0,
+      openingFgQty: Number(row[8]) || 0,
 
-  productionQty: Number(row[9]) || 0,
+      productionQty: Number(row[9]) || 0,
 
-  jobWork: row[10] === true || row[10] === "TRUE",
-  manufacturedQty: Number(row[11]) || 0,
+      jobWork: row[10] === true || row[10] === "TRUE",
+      manufacturedQty: Number(row[11]) || 0,
 
-  dispatchedQty: Number(row[12]) || 0,
+      dispatchedQty: Number(row[12]) || 0,
 
-  orderReceivedBy: row[13] || "",
+      orderReceivedBy: row[13] || "",
 
-  status: row[14] || "",
-}));
+      status: row[14] || "",
+    }));
 
     return res.status(200).json({
       success: true,
@@ -185,7 +185,6 @@ export const getAllSalesOrders = async (req, res) => {
     });
   }
 };
-
 
 //  cancel sales order only status will be changed to cancelled and no data will be deleted from the sheet
 export const cancelSalesOrders = async (req, res) => {
@@ -207,5 +206,3 @@ export const cancelSalesOrders = async (req, res) => {
     });
   }
 };
-
-  
