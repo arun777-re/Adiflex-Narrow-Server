@@ -11,10 +11,12 @@ const processingRequests = new Set();
 // create sales order
 export const createSalesOrder = async (req, res) => {
   try {
+    console.log("Req.body",req.body);
     const {
       date,
       customer,
       division,
+      ordertype,
       jobWork,
       orderReceivedBy,
       products,
@@ -84,8 +86,10 @@ export const createSalesOrder = async (req, res) => {
       values.push([
         soNo,
         date,
+        item.skucode,
         customer,
         item.product,
+        ordertype,
         division,
         item.qty,
         item.rate,
@@ -107,7 +111,9 @@ export const createSalesOrder = async (req, res) => {
       const productionQty = Number(item.qty) - Number(item.openingFgQty);
       productionValues.push([
         soNo,
+        item.skucode,
         item.product,
+        ordertype,
         productionQty,
         division,
         "",

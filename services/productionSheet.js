@@ -23,10 +23,7 @@ export const getProductionOrders = async (division) => {
   return response.data.values || [];
 };
 
-// =====================================================
 // JOB WORK CHECK
-// =====================================================
-
 const isJobWorkOrder = (row) => {
   const value = String(row[PRODUCTION_COLUMNS.JOB_WORK] || "")
     .trim()
@@ -35,10 +32,7 @@ const isJobWorkOrder = (row) => {
   return ["yes", "true", "1", "y"].includes(value);
 };
 
-// =====================================================
 // GET PROCESS STATUS
-// =====================================================
-
 const getProcessStatus = (row, process) => {
   const processMap = PROCESS_MAP[process];
 

@@ -58,7 +58,7 @@ export const appendMultipleSalesOrders =
         salesOrderSpreadsheetId,
 
       range:
-        `${SHEET_NAMES.SALES_MASTER}!A:P`,
+        `${SHEET_NAMES.SALES_MASTER}!A:R`,
 
       valueInputOption:
         "USER_ENTERED",
@@ -124,7 +124,7 @@ export const appendSalesOrderToProductionProcess =
       spreadsheetId: spreadsheetId,
 
       range:
-        `${SHEET_NAMES.PRODUCTION_SHEET}!A:F`,
+        `${SHEET_NAMES.PRODUCTION_SHEET}!A:H`,
 
       valueInputOption:
         "USER_ENTERED",

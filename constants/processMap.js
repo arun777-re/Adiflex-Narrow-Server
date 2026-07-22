@@ -4,70 +4,72 @@
 // =====================================================
 
 export const PRODUCTION_COLUMNS = {
-  SO_NO: 0,                 // A
-  PRODUCT: 1,               // B
-  TARGET_QTY: 2,            // C
-  DIVISION: 3,              // D
-  PRODUCTION_QTY: 4,        // E
-  JOB_WORK: 5,              // F
+  SO_NO: 0, 
+  SKU_CODE:1,                // A
+  PRODUCT: 2,   
+  ORDER_TYPE:3,            // B
+  TARGET_QTY: 4,            // C
+  DIVISION: 5,              // D
+  PRODUCTION_QTY: 6,        // E
+  JOB_WORK: 7,              // F
 
-  JOB_WORK_START: 6,        // G
-  JOB_WORK_END: 7,          // H
+  JOB_WORK_START: 8,        // G
+  JOB_WORK_END: 9,          // H
 
-  WARPING_START: 8,        // I
-  WARPING: 9,               // J
-  WARPING_END: 10,          // K
+  WARPING_START: 10,        // I
+  WARPING: 11,               // J
+  WARPING_END: 12,          // K
 
-  YARN_BEAM_START: 11,     // L
-  YARN_BEAM: 12,            // M
-  YARN_BEAM_END: 13,       // N
+  YARN_BEAM_START: 13,     // L
+  YARN_BEAM: 14,            // M
+  YARN_BEAM_END: 15,       // N
 
-  MACHINE_START: 14,       // O
-  MACHINE: 15,              // P
-  MACHINE_END: 16,          // Q
+  MACHINE_START: 16,       // O
+  MACHINE: 17,              // P
+  MACHINE_END: 18,          // Q
 
-  QUALITY_START: 17,       // R
-  QUALITY: 18,              // S
-  QUALITY_END: 19,         // T
+  QUALITY_START: 19,       // R
+  QUALITY: 20,              // S
+  QUALITY_END: 21,         // T
 
   // ==========================================
   // WASTAGE MOVED AFTER QUALITY
   // ==========================================
 
-  WASTAGE_QTY: 20,          // U
+  WASTAGE_QTY: 22,          // U
 
   // ==========================================
   // FINISHING
   // ==========================================
 
-  FINISHING_START: 21,      // V
-  FINISHING: 22,            // W
-  FINISHING_END: 23,        // X
+  FINISHING_START: 23,      // V
+  FINISHING: 24,            // W
+  FINISHING_END: 25,        // X
 
   // ==========================================
   // ROLLING
   // ==========================================
 
-  ROLLING_START: 24,        // Y
-  ROLLING: 25,              // Z
-  ROLLING_END: 26,          // AA
+  ROLLING_START: 26,        // Y
+  ROLLING: 27,              // Z
+  ROLLING_END: 28,          // AA
 
   // ==========================================
   // PACKING
   // ==========================================
 
-  PACKING_START: 27,        // AB
-  PACKING: 28,              // AC
-  PACKING_END: 29,          // AD
+  PACKING_START: 29,        // AB
+  PACKING:30,              // AC
+  PACKING_END: 31,          // AD
 
   // ==========================================
   // FINAL DATA
   // ==========================================
 
-  STATUS: 30,               // AE
-  NETT_QTY_RTD: 31,         // AF
-  UPDATED_BY: 32,           // AG
-  UPDATED_TIME: 33,         // AH
+  STATUS: 32,               // AE
+  NETT_QTY_RTD: 33,         // AF
+  UPDATED_BY: 34,           // AG
+  UPDATED_TIME: 35,         // AH
 };
 
 
@@ -89,9 +91,9 @@ export const PROCESS_MAP = {
 
     role: "jobWork",
 
-    time: "G",
+    time: "I",
 
-    endTime: "H",
+    endTime: "J",
 
     timeIndex:
       PRODUCTION_COLUMNS.JOB_WORK_START,
@@ -114,11 +116,11 @@ export const PROCESS_MAP = {
 
     role: "warping",
 
-    status: "J",
+    status: "L",
 
-    time: "I",
+    time: "K",
 
-    endTime: "K",
+    endTime: "M",
 
     statusIndex:
       PRODUCTION_COLUMNS.WARPING,
@@ -144,11 +146,11 @@ export const PROCESS_MAP = {
 
     role: "yarnBeam",
 
-    status: "M",
+    status: "O",
 
-    time: "L",
+    time: "N",
 
-    endTime: "N",
+    endTime: "O",
 
     statusIndex:
       PRODUCTION_COLUMNS.YARN_BEAM,
@@ -174,11 +176,11 @@ export const PROCESS_MAP = {
 
     role: "machine",
 
-    status: "P",
+    status: "R",
 
-    time: "O",
+    time: "Q",
 
-    endTime: "Q",
+    endTime: "S",
 
     statusIndex:
       PRODUCTION_COLUMNS.MACHINE,
@@ -204,11 +206,11 @@ export const PROCESS_MAP = {
 
     role: "quality",
 
-    status: "S",
+    status: "U",
 
-    time: "R",
+    time: "T",
 
-    endTime: "T",
+    endTime: "V",
 
     statusIndex:
       PRODUCTION_COLUMNS.QUALITY,
@@ -234,11 +236,11 @@ export const PROCESS_MAP = {
 
     role: "finishing",
 
-    status: "W",
+    status: "Y",
 
-    time: "V",
+    time: "X",
 
-    endTime: "X",
+    endTime: "Z",
 
     statusIndex:
       PRODUCTION_COLUMNS.FINISHING,
@@ -264,11 +266,11 @@ export const PROCESS_MAP = {
 
     role: "rolling",
 
-    status: "Z",
+    status: "AB",
 
-    time: "Y",
+    time: "AA",
 
-    endTime: "AA",
+    endTime: "AC",
 
     statusIndex:
       PRODUCTION_COLUMNS.ROLLING,
@@ -294,11 +296,11 @@ export const PROCESS_MAP = {
 
     role: "packing",
 
-    status: "AC",
+    status: "AE",
 
-    time: "AB",
+    time: "AD",
 
-    endTime: "AD",
+    endTime: "AF",
 
     statusIndex:
       PRODUCTION_COLUMNS.PACKING,
