@@ -1,6 +1,6 @@
 import sheets from "../config/db.js";
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 
-const DISPATCH_SHEET = "Dispatch";
 
 export const appendDispatch = async ({values}) => {
 
@@ -13,7 +13,7 @@ export const appendDispatch = async ({values}) => {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: "Dispatch_Sheets!A:K",
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:K`,
 
     valueInputOption: "USER_ENTERED",
 
@@ -41,7 +41,7 @@ export const getAllDispatchOrders = async () => {
         process.env.GOOGLE_SHEET_ID,
 
       range:
-        `${DISPATCH_SHEET}!A2:K`,
+        `${SHEET_NAMES.DISPATCH_SHEET}!A2:K`,
 
     });
 
@@ -151,7 +151,7 @@ export const dispatchOrder = async ({
         process.env.GOOGLE_SHEET_ID,
 
       range:
-        `${DISPATCH_SHEET}!A2:K`,
+        `${SHEET_NAMES.DISPATCH_SHEET}!A2:K`,
 
     });
 
@@ -261,7 +261,7 @@ export const dispatchOrder = async ({
       process.env.GOOGLE_SHEET_ID,
 
     range:
-      `${DISPATCH_SHEET}!G${rowNumber}`,
+      `${SHEET_NAMES.DISPATCH_SHEET}!G${rowNumber}`,
 
     valueInputOption:
       "USER_ENTERED",
@@ -288,7 +288,7 @@ export const dispatchOrder = async ({
       process.env.GOOGLE_SHEET_ID,
 
     range:
-      `${DISPATCH_SHEET}!H${rowNumber}`,
+      `${SHEET_NAMES.DISPATCH_SHEET}!H${rowNumber}`,
 
     valueInputOption:
       "USER_ENTERED",
@@ -315,7 +315,7 @@ export const dispatchOrder = async ({
       process.env.GOOGLE_SHEET_ID,
 
     range:
-      `${DISPATCH_SHEET}!I${rowNumber}`,
+      `${SHEET_NAMES.DISPATCH_SHEET}!I${rowNumber}`,
 
     valueInputOption:
       "USER_ENTERED",
@@ -342,7 +342,7 @@ export const dispatchOrder = async ({
       process.env.GOOGLE_SHEET_ID,
 
     range:
-      `${DISPATCH_SHEET}!K${rowNumber}`,
+      `${SHEET_NAMES.DISPATCH_SHEET}!K${rowNumber}`,
 
     valueInputOption:
       "USER_ENTERED",
