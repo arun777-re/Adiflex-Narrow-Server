@@ -1,5 +1,6 @@
 import sheets from "../config/db.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
+import { updateDispatchedQty, updateOverallStatus } from "./salesOrderSheet.js";
 
 
 export const appendDispatch = async ({values}) => {
@@ -182,7 +183,6 @@ export const dispatchOrder = async ({
 
   }
 
-
   const rowNumber =
     index + 2;
 
@@ -280,6 +280,18 @@ export const dispatchOrder = async ({
 
   });
 
+  // update dispatch qty into sales order sheet 
+  await updateDispatchedQty({
+    soNo:soNo,
+    product:product,
+    dispatchedQty:newDispatchQty
+  });
+
+  // update overall status 
+  await updateOverallStatus({
+    soNo:soNo,
+    product:product
+  });
 
   // H = Available Qty
   await sheets.spreadsheets.values.update({

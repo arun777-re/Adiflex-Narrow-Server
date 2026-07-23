@@ -78,7 +78,6 @@ export const appendMultipleSalesOrders =
 
 
 // append sales order to production process according to division
-
 export const appendSalesOrderToProductionProcess =
   async (
     values,
@@ -253,3 +252,136 @@ export const cancelSalesOrder =
     return true;
 
   };
+
+// ==========================================
+// UPDATE MANUFACTURED QTY
+// ==========================================
+export const updateManufacturedQty = async ({
+  soNo,
+  product,
+  manufacturedQty,
+}) => {
+  const authClient = await auth.getClient();
+
+  const rows = await getSalesOrders();
+
+  const rowIndex = rows.findIndex(
+    (row) =>
+      row[0] === soNo &&
+      row[4] === product
+  );
+
+  if (rowIndex === -1) {
+    throw new Error("Sales Order not found");
+  }
+
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!N${rowIndex + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[manufacturedQty]],
+    },
+  });
+
+  return true;
+};
+
+// ==========================================
+// UPDATE DISPATCHED QTY
+// ==========================================
+export const updateDispatchedQty = async ({
+  soNo,
+  product,
+  dispatchedQty,
+}) => {
+  const authClient = await auth.getClient();
+
+  const rows = await getSalesOrders();
+
+  const rowIndex = rows.findIndex(
+    (row) =>
+      row[0] === soNo &&
+      row[4] === product
+  );
+
+  if (rowIndex === -1) {
+    throw new Error("Sales Order not found");
+  }
+
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!O${rowIndex + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[dispatchedQty]],
+    },
+  });
+
+  return true;
+};
+
+
+// ==========================================
+// UPDATE OVERALL STATUS
+// ==========================================
+export const updateOverallStatus = async ({
+  soNo,
+  product,
+}) => {
+  const authClient = await auth.getClient();
+
+  const rows = await getSalesOrders();
+
+  const rowIndex = rows.findIndex(
+    (row) =>
+      row[0] === soNo &&
+      row[4] === product
+  );
+
+  if (rowIndex === -1) {
+    throw new Error("Sales Order not found");
+  }
+
+  const soQty = Number(rows[rowIndex][7]) || 0;
+  const manufacturedQty = Number(rows[rowIndex][13]) || 0;
+  const dispatchedQty = Number(rows[rowIndex][14]) || 0;
+
+  let status = "Pending";
+
+  if (manufacturedQty > 0) {
+    status = "In Production";
+  }
+
+  if (manufacturedQty >= soQty && soQty > 0) {
+    status = "Ready To Dispatch";
+  }
+
+  if (
+    dispatchedQty > 0 &&
+    dispatchedQty < manufacturedQty
+  ) {
+    status = "Partially Dispatched";
+  }
+
+  if (
+    manufacturedQty > 0 &&
+    dispatchedQty >= manufacturedQty
+  ) {
+    status = "Completed";
+  }
+
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!Q${rowIndex + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[status]],
+    },
+  });
+
+  return status;
+};

@@ -2,6 +2,7 @@ import sheets, { getDatabaseByDivision, updateCell } from "../config/db.js";
 
 import { PROCESS_MAP, PRODUCTION_COLUMNS } from "../constants/processMap.js";
 import { appendDispatch } from "./dispatchSheet.js";
+import { updateManufacturedQty } from "./salesOrderSheet.js";
 
 // =====================================================
 // GET PRODUCTION ORDERS
@@ -489,6 +490,12 @@ export const completeQualityWithWastage = async ({
     range: `AH${rowNumber}`,
 
     value: nettQtyRTD,
+  });
+
+  // update manufactured qty in sales_order sheet
+  await updateManufacturedQty({
+    soNo:soNo,product:product,
+    manufacturedQty:nettQtyRTD
   });
 
   // UPDATED BY
