@@ -12,7 +12,7 @@ import {
 // start production process
 export const startProduction = async (req, res) => {
   try {
-    const { soNo, product, process, updatedBy,division } = req.body;
+    const { soNo, product, process, updatedBy, division } = req.body;
 
     if (!soNo || !product || !process) {
       return res.status(400).json({
@@ -30,7 +30,7 @@ export const startProduction = async (req, res) => {
       process,
 
       updatedBy,
-      division
+      division,
     });
 
     return res.status(200).json({
@@ -39,7 +39,7 @@ export const startProduction = async (req, res) => {
       message: `${process} Started Successfully`,
     });
   } catch (error) {
-    console.log("Error aaya hai bhai:",error);
+    console.log("Error aaya hai bhai:", error);
     return res.status(400).json({
       success: false,
 
@@ -51,7 +51,8 @@ export const startProduction = async (req, res) => {
 // complete production process
 export const completeProduction = async (req, res) => {
   try {
-    const { soNo, product, process, productionQty, updatedBy,division } = req.body;
+    const { soNo, product, process, productionQty, updatedBy, division } =
+      req.body;
 
     if (!soNo || !product || !process || !division) {
       return res.status(400).json({
@@ -80,7 +81,7 @@ export const completeProduction = async (req, res) => {
       message: `${process} Completed Successfully`,
     });
   } catch (error) {
-    console.log("Error aaya hai bhai:",error)
+    console.log("Error aaya hai bhai:", error);
     return res.status(400).json({
       success: false,
 
@@ -117,18 +118,17 @@ export const getAllProductionOrders = async (req, res) => {
       jobWorkStartTime: row[PRODUCTION_COLUMNS.JOB_WORK_START] || "",
 
       jobWorkEndTime: row[PRODUCTION_COLUMNS.JOB_WORK_END] || "",
-
       warpingStartAt: row[PRODUCTION_COLUMNS.WARPING_START] || "",
 
       warping: row[PRODUCTION_COLUMNS.WARPING] || "",
 
       warpingEndsAt: row[PRODUCTION_COLUMNS.WARPING_END] || "",
 
-      yarnBeamStartAt: row[PRODUCTION_COLUMNS.YARN_BEAM_START] || "",
+      fillingStartAt: row[PRODUCTION_COLUMNS.FILLING_START] || "",
 
-      yarnBeam: row[PRODUCTION_COLUMNS.YARN_BEAM] || "",
+      filling: row[PRODUCTION_COLUMNS.FILLING] || "",
 
-      yarnBeamEndsAt: row[PRODUCTION_COLUMNS.YARN_BEAM_END] || "",
+      fillingEndsAt: row[PRODUCTION_COLUMNS.FILLING_END] || "",
 
       machineStartsAt: row[PRODUCTION_COLUMNS.MACHINE_START] || "",
 
@@ -267,9 +267,10 @@ export const updateWastage = async (req, res) => {
 // =====================================================
 
 export const completeQuality = async (req, res) => {
+  console.log("req.body:",req.body);
   try {
-    const { soNo, product, wastageQty, updatedBy,division } = req.body;
-    console.log("req .body",req.body);
+    const { soNo, product, wastageQty, updatedBy, division } = req.body;
+    console.log("req .body", req.body);
 
     if (!soNo || !division || !product || wastageQty === undefined) {
       return res.status(400).json({
@@ -284,7 +285,7 @@ export const completeQuality = async (req, res) => {
       product,
       wastageQty,
       updatedBy,
-      division
+      division,
     });
 
     return res.status(200).json({
@@ -295,6 +296,7 @@ export const completeQuality = async (req, res) => {
       data: result,
     });
   } catch (error) {
+    console.error(error)
     return res.status(400).json({
       success: false,
 

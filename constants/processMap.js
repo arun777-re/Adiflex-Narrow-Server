@@ -20,31 +20,32 @@ export const PRODUCTION_COLUMNS = {
   WARPING: 11,               // J
   WARPING_END: 12,          // K
 
-  YARN_BEAM_START: 13,     // L
-  YARN_BEAM: 14,            // M
-  YARN_BEAM_END: 15,       // N
+  FILLING_START: 13,     // L
+  FILLING: 14,            // M
+  FILLING_END: 15,       // N
 
   MACHINE_START: 16,       // O
   MACHINE: 17,              // P
   MACHINE_END: 18,          // Q
+  
+  // ==========================================
+  // FINISHING
+  // ==========================================
 
-  QUALITY_START: 19,       // R
-  QUALITY: 20,              // S
-  QUALITY_END: 21,         // T
+  FINISHING_START: 19,      // V
+  FINISHING: 20,            // W
+  FINISHING_END: 21,        // X
+
+  QUALITY_START: 22,       // R
+  QUALITY: 23,              // S
+  QUALITY_END: 24,         // T
 
   // ==========================================
   // WASTAGE MOVED AFTER QUALITY
   // ==========================================
 
-  WASTAGE_QTY: 22,          // U
+  WASTAGE_QTY: 25,          // U
 
-  // ==========================================
-  // FINISHING
-  // ==========================================
-
-  FINISHING_START: 23,      // V
-  FINISHING: 24,            // W
-  FINISHING_END: 25,        // X
 
   // ==========================================
   // ROLLING
@@ -135,16 +136,16 @@ export const PROCESS_MAP = {
 
 
   // ==========================================
-  // YARN BEAM
+  // FILLING
   // ==========================================
 
-  yarnBeam: {
+  filling: {
 
     order: 2,
 
     previous: "warping",
 
-    role: "yarnBeam",
+    role: "filling",
 
     status: "O",
 
@@ -153,13 +154,13 @@ export const PROCESS_MAP = {
     endTime: "P",
 
     statusIndex:
-      PRODUCTION_COLUMNS.YARN_BEAM,
+      PRODUCTION_COLUMNS.FILLING,
 
     timeIndex:
-      PRODUCTION_COLUMNS.YARN_BEAM_START,
+      PRODUCTION_COLUMNS.FILLING_START,
 
     endTimeIndex:
-      PRODUCTION_COLUMNS.YARN_BEAM_END,
+      PRODUCTION_COLUMNS.FILLING_END,
 
   },
 
@@ -172,7 +173,7 @@ export const PROCESS_MAP = {
 
     order: 3,
 
-    previous: "yarnBeam",
+    previous: "filling",
 
     role: "machine",
 
@@ -194,23 +195,54 @@ export const PROCESS_MAP = {
   },
 
 
+
+
+
   // ==========================================
-  // QUALITY
+  // FINISHING
   // ==========================================
 
-  quality: {
+  finishing: {
 
     order: 4,
 
     previous: "machine",
 
-    role: "quality",
+    role: "finishing",
 
     status: "U",
 
     time: "T",
 
     endTime: "V",
+
+    statusIndex:
+      PRODUCTION_COLUMNS.FINISHING,
+
+    timeIndex:
+      PRODUCTION_COLUMNS.FINISHING_START,
+
+    endTimeIndex:
+      PRODUCTION_COLUMNS.FINISHING_END,
+
+  },
+  // ==========================================
+  // QUALITY
+  // ==========================================
+
+  quality: {
+
+    order: 5,
+
+    previous: "finishing",
+
+    role: "quality",
+
+    status: "X",
+
+    time: "W",
+
+    endTime: "Y",
 
     statusIndex:
       PRODUCTION_COLUMNS.QUALITY,
@@ -223,37 +255,6 @@ export const PROCESS_MAP = {
 
   },
 
-
-  // ==========================================
-  // FINISHING
-  // ==========================================
-
-  finishing: {
-
-    order: 5,
-
-    previous: "quality",
-
-    role: "finishing",
-
-    status: "Y",
-
-    time: "X",
-
-    endTime: "Z",
-
-    statusIndex:
-      PRODUCTION_COLUMNS.FINISHING,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.FINISHING_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.FINISHING_END,
-
-  },
-
-
   // ==========================================
   // ROLLING
   // ==========================================
@@ -262,7 +263,7 @@ export const PROCESS_MAP = {
 
     order: 6,
 
-    previous: "finishing",
+    previous: "quality",
 
     role: "rolling",
 
