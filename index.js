@@ -7,6 +7,8 @@ import authRoutes from './routes/authRoutes.js';
 import salesOrderRoutes from './routes/salesOrderRoutes.js';
 import productionRoutes from './routes/productionRoutes.js';
 import dispatchRoutes from './routes/dispatchRoutes.js';
+import productRoutes from './routes/productRoutes.js';
+import fgRoutes from './routes/fgRoutes.js';
 
 
 
@@ -32,6 +34,8 @@ app.use('/auth', authRoutes);
 app.use('/sales-orders', salesOrderRoutes);
 app.use('/production', productionRoutes);
 app.use('/dispatch',dispatchRoutes);
+app.use('/products',productRoutes);
+app.use('/fg',fgRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

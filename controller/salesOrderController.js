@@ -10,40 +10,42 @@ const processingRequests = new Set();
 
 // create sales order
 export const createSalesOrder = async (req, res) => {
+  console.log("req",req.body);
+  let requestKey;
   try {
     const {
       date,
       customer,
-      division,
       ordertype,
       jobWork,
       orderReceivedBy,
       products,
-      location,
+      shippinglocation,
+      freight,
+      billinglocation,
     } = req.body;
 
     // validations
     if (
       !date ||
       !customer ||
-      !division ||
       !products ||
       !products.length ||
-      !location
+      !shippinglocation || 
+      !billinglocation 
     ) {
       return res.status(400).json({
         success: false,
 
-        message: "Date, Customer, Division, Products and Location are required",
+        message: "Date, Customer,Products and Location are required",
       });
     }
     // deduplications
 
-    const requestKey = JSON.stringify({
+     requestKey = JSON.stringify({
       date,
       customer,
-      division,
-      location,
+      shippinglocation,
       products,
     });
 
@@ -56,15 +58,20 @@ export const createSalesOrder = async (req, res) => {
 
     processingRequests.add(requestKey);
 
-    const normalizedDivision = String(division).trim().toLowerCase();
+    const normalizedDivision = products.map(item=>{
 
-    if (!ALLOWED_DIVISIONS.includes(normalizedDivision)) {
-      return res.status(400).json({
-        success: false,
+      return String(item.division).trim().toLowerCase()});
+      console.log("normalized division",normalizedDivision)
 
-        message: "Invalid Division",
-      });
-    }
+
+   const hasInvalidDivision = products.some((item)=>!ALLOWED_DIVISIONS.includes(String(item.division)
+   .trim().toLowerCase()));
+   if(hasInvalidDivision){
+    return res.status(400).json({
+      success:false,
+      message:"Invalid Division"
+    });
+   }
 
     const rows = await getSalesOrders();
 
@@ -89,18 +96,23 @@ export const createSalesOrder = async (req, res) => {
         customer,
         item.product,
         ordertype,
-        division,
+        item.division,
         item.qty,
         item.rate,
+        item.rateadjustment,
+        item.finalrate,
         item.unit,
         item.openingFgQty,
         productionQty,
         jobWork,
+        freight,
         0,
         0,
         orderReceivedBy,
         "Pending",
-        location,
+        billinglocation,
+        shippinglocation,
+        Number(item.finalrate) * Number(item.qty),
       ]);
     });
 
@@ -114,7 +126,7 @@ export const createSalesOrder = async (req, res) => {
         item.product,
         ordertype,
         productionQty,
-        division,
+        item.division,
         "",
         jobWork,
       ]);
@@ -132,13 +144,14 @@ export const createSalesOrder = async (req, res) => {
       soNo,
     });
   } catch (error) {
+    console.log("error in req:",error);
     return res.status(500).json({
       success: false,
 
       message: error.message,
     });
-  }finally{
-     processingRequests.delete(requestKey);
+  } finally {
+    processingRequests.delete(requestKey);
   }
 };
 
