@@ -277,7 +277,7 @@ export const updateManufacturedQty = async ({
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
-    spreadsheetId,
+    spreadsheetId:salesOrderSpreadsheetId,
     range: `${SHEET_NAMES.SALES_MASTER}!N${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {

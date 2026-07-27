@@ -460,7 +460,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `V${rowNumber}`,
+    range: `Y${rowNumber}`,
 
     value: now,
   });
@@ -469,7 +469,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `U${rowNumber}`,
+    range: `X${rowNumber}`,
 
     value: "Completed",
   });
@@ -478,7 +478,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `W${rowNumber}`,
+    range: `Z${rowNumber}`,
 
     value: wastage,
   });
