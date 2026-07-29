@@ -1,9 +1,43 @@
-import sheets, { auth } from "../config/db.js";
+import sheets, { auth, updateCell } from "../config/db.js";
 
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 import { getSalesOrders } from "./salesOrderSheet.js"; 
 
+
+// get fg inventory
+export const getFGInventory = async () => {
+  const authClient = await auth.getClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+    range: `${SHEET_NAMES.INVENTORY_SHEET}!A:J`,
+  });
+
+  return response.data.values || [];
+};
+
+// find current stock by sku code 
+export const findFGStockBySKU = async (sku) => {
+  const rows = await getFGInventory();
+
+  // Header remove
+  const data = rows.slice(1);
+
+  const index = data.findIndex(
+    (row) => row[0] === sku
+  );
+
+  if (index === -1) {
+    return null;
+  }
+
+  return {
+    rowNumber: index + 2, // Actual Google Sheet Row
+    row: data[index],
+  };
+};
 
 // service to append fg into fg sheet
 export const handleInternalFG = async ({
@@ -14,61 +48,100 @@ export const handleInternalFG = async ({
 }) => {
   const authClient = await auth.getClient();
 
-  // Get Sales Orders
-  const rows = await getSalesOrders();
+  // ==========================================
+  // GET SALES ORDER
+  // ==========================================
 
-  const row = rows.find(
+  const salesRows = await getSalesOrders();
+
+  const salesRow = salesRows.find(
     (item) =>
       item[0] === soNo &&
       item[4] === product
   );
 
-  if (!row) {
+  if (!salesRow) {
     throw new Error("Sales Order not found");
   }
 
-  const orderType = row[5];
-  const division = row[6];
+  const orderType = salesRow[5];
 
   // Only Internal Orders
   if (orderType !== "Internal") {
-    return;
+    return true;
   }
 
-  let sheetName = "";
+  const sku = salesRow[2];
+  const division = salesRow[6];
+  const unit = salesRow[11];
+  const location = salesRow[21];
 
-  switch (division) {
-    case "Woven":
-      sheetName = SHEET_NAMES.FG_WOVEN;
-      break;
+  // ==========================================
+  // GET FG INVENTORY
+  // ==========================================
+const now = new Date().toLocaleString();
 
-    case "Crochet":
-      sheetName = SHEET_NAMES.FG_CROCHET;
-      break;
+const fgStock = await findFGStockBySKU(sku);
 
-    default:
-      throw new Error("Invalid Division");
-  }
+// ==========================================
+// SKU NOT FOUND -> INSERT
+// ==========================================
 
+if (!fgStock) {
   await sheets.spreadsheets.values.append({
     auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: sheetName,
+    spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+    range: `${SHEET_NAMES.INVENTORY_SHEET}!A:J`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
-      values: [
-        [
-          new Date().toISOString(),
-          soNo,
-          product,
-          division,
-          qty,
-          updatedBy,
-        ],
-      ],
+      values: [[
+        sku,
+        product,
+        division,
+        unit,
+        Number(qty),
+        0,
+        0,
+        location,
+        now,
+        updatedBy,
+      ]],
     },
   });
 
   return true;
+}
+
+// ==========================================
+// SKU FOUND -> UPDATE STOCK
+// ==========================================
+
+const oldQty = Number(fgStock.row[4] || 0);
+
+const newQty = oldQty + Number(qty);
+
+await updateCell({
+  spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+  sheetName: SHEET_NAMES.INVENTORY_SHEET,
+  range: `E${fgStock.rowNumber}`,
+  value: newQty,
+});
+
+await updateCell({
+  spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+  sheetName: SHEET_NAMES.INVENTORY_SHEET,
+  range: `I${fgStock.rowNumber}`,
+  value: now,
+});
+
+await updateCell({
+  spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+  sheetName: SHEET_NAMES.INVENTORY_SHEET,
+  range: `J${fgStock.rowNumber}`,
+  value: updatedBy,
+});
+
+return true;
+  
 };

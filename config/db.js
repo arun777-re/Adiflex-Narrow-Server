@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config()
+dotenv.config();
 import { google } from "googleapis";
 
 import fs from "fs";
@@ -12,7 +12,7 @@ export const DATABASES = {
 };
 
 export const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
+  keyFile: "config/credentials.json",
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 

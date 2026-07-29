@@ -1,7 +1,12 @@
 import sheets, { getDatabaseByDivision, updateCell } from "../config/db.js";
 
 import { PROCESS_MAP, PRODUCTION_COLUMNS } from "../constants/processMap.js";
+import {
+  handleFinishedGoods,
+  resetProductionCycle,
+} from "../helpers/productionHelpers.js";
 import { appendDispatch } from "./dispatchSheet.js";
+import { handleInternalFG } from "./fgSheets.js";
 import { updateManufacturedQty } from "./salesOrderSheet.js";
 
 // =====================================================
@@ -338,8 +343,8 @@ export const completeProductionProcess = async ({
   if (processMap.status) {
     await updateCell({
       division,
-       range: `${processMap.status}${rowNumber}`,
-       value: "Completed",
+      range: `${processMap.status}${rowNumber}`,
+      value: "Completed",
     });
   }
 
@@ -363,12 +368,6 @@ export const completeProductionProcess = async ({
 
   // PACKING COMPLETED
   if (process === "packing") {
-    await updateCell({
-      division,
-      range: `AG${rowNumber}`,
-      value: "Ready To Dispatch",
-    });
-
     const finalProductionQty = Number(
       process === firstProcess
         ? productionQty
@@ -378,22 +377,40 @@ export const completeProductionProcess = async ({
     const wastageQty = Number(row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0);
 
     const nettQtyRTD = finalProductionQty - wastageQty;
+    const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY]);
 
-    await appendDispatch({
-      values: [
-        soNo, // A
-        product, // B
-        division, // C
-        finalProductionQty, // D
-        wastageQty, // E
-        nettQtyRTD, // F
-        0, // G Dispatch Qty
-        nettQtyRTD, // H Available Qty
-        "Ready To Dispatch", // I
-        now, // J Created At
-        now, // K Updated At
-      ],
+    if (finalProductionQty > targetQty || nettQtyRTD < 0) {
+      throw new Error(
+        "Production Qty cannot exceed Target Qty/ Wastage Qty cannot be greater than production qty.",
+      );
+    }
+
+    const remainingQty = targetQty - nettQtyRTD;
+
+    await handleFinishedGoods({
+      soNo: soNo,
+      product: product,
+      division: division,
+      manufacturedQty: nettQtyRTD,
+      wastageQty: wastageQty,
+      updatedBy: updatedBy,
     });
+    if (remainingQty > 0) {
+      await resetProductionCycle({
+        soNo,
+        product,
+        division,
+        remainingQty,
+        updatedBy,
+      });
+    } else {
+      // Close Order
+      await updateCell({
+        division,
+        range: `AG${rowNumber}`,
+        value: "Completed",
+      });
+    }
   }
 
   return true;
@@ -494,8 +511,9 @@ export const completeQualityWithWastage = async ({
 
   // update manufactured qty in sales_order sheet
   await updateManufacturedQty({
-    soNo:soNo,product:product,
-    manufacturedQty:nettQtyRTD
+    soNo: soNo,
+    product: product,
+    manufacturedQty: nettQtyRTD,
   });
 
   // UPDATED BY

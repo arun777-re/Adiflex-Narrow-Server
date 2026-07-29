@@ -1,16 +1,18 @@
+import { addDirectDispatchOrder } from "../helpers/salesOrderHelpers.js";
 import {
   getSalesOrders,
   appendMultipleSalesOrders,
   cancelSalesOrder,
   appendSalesOrderToProductionProcess,
   ALLOWED_DIVISIONS,
+  updateOverallStatus,
 } from "../services/salesOrderSheet.js";
 
 const processingRequests = new Set();
 
 // create sales order
 export const createSalesOrder = async (req, res) => {
-  console.log("req",req.body);
+  console.log("req", req.body);
   let requestKey;
   try {
     const {
@@ -31,8 +33,8 @@ export const createSalesOrder = async (req, res) => {
       !customer ||
       !products ||
       !products.length ||
-      !shippinglocation || 
-      !billinglocation 
+      !shippinglocation ||
+      !billinglocation
     ) {
       return res.status(400).json({
         success: false,
@@ -42,7 +44,7 @@ export const createSalesOrder = async (req, res) => {
     }
     // deduplications
 
-     requestKey = JSON.stringify({
+    requestKey = JSON.stringify({
       date,
       customer,
       shippinglocation,
@@ -58,20 +60,21 @@ export const createSalesOrder = async (req, res) => {
 
     processingRequests.add(requestKey);
 
-    const normalizedDivision = products.map(item=>{
-
-      return String(item.division).trim().toLowerCase()});
-      console.log("normalized division",normalizedDivision)
-
-
-   const hasInvalidDivision = products.some((item)=>!ALLOWED_DIVISIONS.includes(String(item.division)
-   .trim().toLowerCase()));
-   if(hasInvalidDivision){
-    return res.status(400).json({
-      success:false,
-      message:"Invalid Division"
+    const normalizedDivision = products.map((item) => {
+      return String(item.division).trim().toLowerCase();
     });
-   }
+    console.log("normalized division", normalizedDivision);
+
+    const hasInvalidDivision = products.some(
+      (item) =>
+        !ALLOWED_DIVISIONS.includes(String(item.division).trim().toLowerCase()),
+    );
+    if (hasInvalidDivision) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Division",
+      });
+    }
 
     const rows = await getSalesOrders();
 
@@ -88,7 +91,8 @@ export const createSalesOrder = async (req, res) => {
     const values = [];
 
     products.forEach((item) => {
-      const productionQty = Number(item.qty) - Number(item.openingFgQty);
+      const productionQty =Math.max(Number(item.qty) - Number(item.openingFgQty),0);
+      const status = Number(item.openingFgQty) >= Number(item.qty) ? "Ready To Dispatch" : "Pending Production";
       values.push([
         soNo,
         date,
@@ -109,7 +113,7 @@ export const createSalesOrder = async (req, res) => {
         0,
         0,
         orderReceivedBy,
-        "Pending",
+        status,
         billinglocation,
         shippinglocation,
         Number(item.finalrate) * Number(item.qty),
@@ -118,33 +122,56 @@ export const createSalesOrder = async (req, res) => {
 
     // values for production state
     const productionValues = [];
-    products.forEach((item) => {
-      const productionQty = Number(item.qty) - Number(item.openingFgQty);
-      productionValues.push([
-        soNo,
-        item.skucode,
-        item.product,
-        ordertype,
-        productionQty,
-        item.division,
-        "",
-        jobWork,
-      ]);
-    });
-    await appendMultipleSalesOrders(values);
-    await appendSalesOrderToProductionProcess(
-      productionValues,
-      normalizedDivision,
-    );
-    return res.status(201).json({
-      success: true,
+        await appendMultipleSalesOrders(values);
 
-      message: "Sales Order Created",
+    for (let item of products) {
+      const soQty = Number(item.qty);
+      const openingFG = Number(item.openingFgQty);
+      const productionQty = Math.max(soQty - openingFG,0);
+      //  Enough FG available
+      if (openingFG >= soQty) {
+        await addDirectDispatchOrder({
+          soNo,
+          sku: item.skucode,
+          product: item.product,
+          division: item.division,
+          qty: soQty,
+          location: shippinglocation,
+          updatedBy: orderReceivedBy,
+        });
+      
+      } else {
+        productionValues.push([
+          soNo,
+          item.skucode,
+          item.product,
+          ordertype,
+          productionQty,
+          item.division,
+          "",
+          jobWork,
+        ]);
 
-      soNo,
-    });
+     
+     
+      }
+  
+    }
+       if (productionValues.length > 0) {
+          await appendSalesOrderToProductionProcess(
+            productionValues,
+            normalizedDivision,
+          );
+        }
+          return res.status(201).json({
+          success: true,
+
+          message: "Sales Order Created",
+
+          soNo,
+        });
   } catch (error) {
-    console.log("error in req:",error);
+    console.log("error in req:", error);
     return res.status(500).json({
       success: false,
 
