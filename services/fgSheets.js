@@ -14,7 +14,6 @@ export const getFGInventory = async () => {
     spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
     range: `${SHEET_NAMES.INVENTORY_SHEET}!A:J`,
   });
-
   return response.data.values || [];
 };
 
@@ -144,4 +143,147 @@ await updateCell({
 
 return true;
   
+};
+
+
+export const getFGAvailableQtyService = async (sku) => {
+  try {
+    const fgStock = await findFGStockBySKU(sku);
+
+    if (!fgStock) {
+      return 0;
+    }
+
+    return Number(fgStock.row[4] || 0);
+  } catch (error) {
+    throw error;
+  }
+};
+
+// ==========================================
+// CONSUME FG STOCK
+// ==========================================
+
+export const consumeFGStockService = async ({
+  sku,
+  qty,
+  updatedBy,
+}) => {
+  try {
+    const fgStock = await findFGStockBySKU(sku);
+
+    if (!fgStock) {
+      throw new Error("FG Stock not found");
+    }
+
+    const availableQty = Number(fgStock.row[4] || 0);
+
+    if (availableQty < qty) {
+      throw new Error("Insufficient FG Stock");
+    }
+
+    const now = new Date().toLocaleString();
+
+    await updateCell({
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+      sheetName: SHEET_NAMES.INVENTORY_SHEET,
+      range: `E${fgStock.rowNumber}`,
+      value: availableQty - Number(qty),
+    });
+
+    await updateCell({
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+      sheetName: SHEET_NAMES.INVENTORY_SHEET,
+      range: `I${fgStock.rowNumber}`,
+      value: now,
+    });
+
+    await updateCell({
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+      sheetName: SHEET_NAMES.INVENTORY_SHEET,
+      range: `J${fgStock.rowNumber}`,
+      value: updatedBy,
+    });
+
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// ==========================================
+// ADD FG STOCK
+// ==========================================
+
+export const addFGStockService = async ({
+  sku,
+  product,
+  division,
+  unit,
+  location,
+  qty,
+  updatedBy,
+}) => {
+  try {
+    const authClient = await auth.getClient();
+
+    const fgStock = await findFGStockBySKU(sku);
+
+    const now = new Date().toLocaleString();
+
+    // SKU NOT FOUND
+    if (!fgStock) {
+      await sheets.spreadsheets.values.append({
+        auth: authClient,
+        spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+        range: `${SHEET_NAMES.INVENTORY_SHEET}!A:J`,
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: {
+          values: [[
+            sku,
+            product,
+            division,
+            unit,
+            Number(qty),
+            0,
+            0,
+            location,
+            now,
+            updatedBy,
+          ]],
+        },
+      });
+
+      return true;
+    }
+
+    // SKU FOUND
+    const availableQty = Number(fgStock.row[4] || 0);
+
+    await updateCell({
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+      sheetName: SHEET_NAMES.INVENTORY_SHEET,
+      range: `E${fgStock.rowNumber}`,
+      value: availableQty + Number(qty),
+    });
+
+    await updateCell({
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+      sheetName: SHEET_NAMES.INVENTORY_SHEET,
+      range: `I${fgStock.rowNumber}`,
+      value: now,
+    });
+
+    await updateCell({
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+      sheetName: SHEET_NAMES.INVENTORY_SHEET,
+      range: `J${fgStock.rowNumber}`,
+      value: updatedBy,
+    });
+
+    return true;
+  } catch (error) {
+    throw error;
+  }
 };
