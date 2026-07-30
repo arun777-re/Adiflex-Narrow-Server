@@ -9,6 +9,7 @@ import productionRoutes from './routes/productionRoutes.js';
 import dispatchRoutes from './routes/dispatchRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import fgRoutes from './routes/fgRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 
 
 
@@ -35,7 +36,9 @@ app.use('/sales-orders', salesOrderRoutes);
 app.use('/production', productionRoutes);
 app.use('/dispatch',dispatchRoutes);
 app.use('/products',productRoutes);
+app.use('/dashboard',dashboardRoutes);
 app.use('/fg',fgRoutes);
+
 
 // Start server
 const PORT = process.env.PORT || 5000;
