@@ -2,8 +2,8 @@ import sheets, { getDatabaseByDivision, updateCell } from "../config/db.js";
 
 import { PROCESS_MAP, PRODUCTION_COLUMNS } from "../constants/processMap.js";
 import {
+  createNextProductionCycle,
   handleFinishedGoods,
-  resetProductionCycle,
 } from "../helpers/productionHelpers.js";
 import { appendDispatch } from "./dispatchSheet.js";
 import { handleInternalFG } from "./fgSheets.js";
@@ -396,13 +396,15 @@ export const completeProductionProcess = async ({
       updatedBy: updatedBy,
     });
     if (remainingQty > 0) {
-      await resetProductionCycle({
-        soNo,
-        product,
-        division,
-        remainingQty,
-        updatedBy,
-      });
+      await updateCell({division,
+        range:`AG${rowNumber}`,
+        value:"Cycle Completed"
+      })
+   await createNextProductionCycle({
+  division,
+  currentRow: row,
+  remainingQty,
+});
     } else {
       // Close Order
       await updateCell({

@@ -99,8 +99,9 @@ export const getAllProductionOrders = async (req, res) => {
 
     const data = rows.slice(1);
 
-    const productionOrders = data.map((row) => ({
-      id: `${row[PRODUCTION_COLUMNS.SO_NO]}-${row[PRODUCTION_COLUMNS.PRODUCT]}`,
+    const productionOrders = data.map((row,index) => ({
+       rowNumber:index + 2 ,
+      id: `${row[PRODUCTION_COLUMNS.SO_NO]}-${row[PRODUCTION_COLUMNS.PRODUCT]}-${index + 2}`,
 
       soNo: row[PRODUCTION_COLUMNS.SO_NO] || "",
 

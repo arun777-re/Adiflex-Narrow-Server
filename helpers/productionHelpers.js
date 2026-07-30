@@ -1,143 +1,140 @@
-import { updateCell } from "../config/db.js";
+import { getDatabaseByDivision, updateCell } from "../config/db.js";
 import { appendDispatch } from "../services/dispatchSheet.js";
 import { handleInternalFG } from "../services/fgSheets.js";
+import sheets, { auth } from "../config/db.js";
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 
-export const handleFinishedGoods = async ({
-    soNo,
-    product,
-    division,
-    manufacturedQty,
-    wastageQty,
-    updatedBy
-}) => {
+import { getSalesOrders } from "../services/salesOrderSheet.js";
 
-    const nettQty = manufacturedQty - wastageQty;
+const getOrderType = async (soNo, product) => {
+  const rows = await getSalesOrders();
 
-    const orderType = await getOrderType(soNo, product);
+  const data = rows.slice(1);
 
-    if (orderType === "Customer") {
+  const order = data.find((row) => row[0] === soNo && row[4] === product);
 
-        await appendDispatch({
-            values: [
-                soNo,
-                product,
-                division,
-                manufacturedQty,
-                wastageQty,
-                nettQty,
-                0,
-                nettQty,
-                "Ready To Dispatch",
-                new Date().toLocaleString(),
-                new Date().toLocaleString(),
-            ],
-        });
+  if (!order) {
+    throw new Error("Sales Order not found");
+  }
 
-    } else {
-
-        await handleInternalFG({
-            soNo,
-            product,
-            qty: nettQty,
-            updatedBy,
-        });
-
-    }
-
-    return nettQty;
+  return order[5];
 };
 
-
-export const resetProductionCycle = async ({
-    division,
-    rowNumber,
-    remainingQty,
+export const handleFinishedGoods = async ({
+  soNo,
+  product,
+  division,
+  manufacturedQty,
+  wastageQty,
+  updatedBy,
 }) => {
+  const nettQty = manufacturedQty - wastageQty;
 
-    // Target Qty
-    await updateCell({
+  const orderType = await getOrderType(soNo, product);
+
+  if (orderType === "Customer") {
+    await appendDispatch({
+      values: [
+        soNo,
+        product,
         division,
-        range: `E${rowNumber}`,
-        value: remainingQty,
+        manufacturedQty,
+        wastageQty,
+        nettQty,
+        0,
+        nettQty,
+        "Ready To Dispatch",
+        new Date().toLocaleString(),
+        new Date().toLocaleString(),
+      ],
     });
-
-    // Production Qty
-    await updateCell({
-        division,
-        range: `G${rowNumber}`,
-        value: "",
+  } else {
+    await handleInternalFG({
+      soNo,
+      product,
+      qty: nettQty,
+      updatedBy,
     });
+  }
 
-    // Job Work
-    await updateCell({ division, range:`H${rowNumber}`, value:"" });
-    await updateCell({ division, range:`I${rowNumber}`, value:"" });
-    await updateCell({ division, range:`J${rowNumber}`, value:"" });
+  return nettQty;
+};
 
-    // Warping
-    await updateCell({ division, range:`K${rowNumber}`, value:"" });
-    await updateCell({ division, range:`L${rowNumber}`, value:"" });
-    await updateCell({ division, range:`M${rowNumber}`, value:"" });
+export const createNextProductionCycle = async ({
+  division,
+  currentRow,
+  remainingQty,
+}) => {
+  const authClient = await auth.getClient();
 
-    // Filling
-    await updateCell({ division, range:`N${rowNumber}`, value:"" });
-    await updateCell({ division, range:`O${rowNumber}`, value:"" });
-    await updateCell({ division, range:`P${rowNumber}`, value:"" });
+  // Current row se basic data uthao
+  const values = [
+    [
+      currentRow[0], // SO No
+      currentRow[1], // SKU Code
+      currentRow[2], // Product
+      currentRow[3], // Order Type
+      remainingQty, // Target Qty (Remaining)
+      currentRow[5], // Division
 
-    // Machine
-    await updateCell({ division, range:`Q${rowNumber}`, value:"" });
-    await updateCell({ division, range:`R${rowNumber}`, value:"" });
-    await updateCell({ division, range:`S${rowNumber}`, value:"" });
+      "", // Production Qty
 
-    // Finishing
-    await updateCell({ division, range:`T${rowNumber}`, value:"" });
-    await updateCell({ division, range:`U${rowNumber}`, value:"" });
-    await updateCell({ division, range:`V${rowNumber}`, value:"" });
+      currentRow[7], // Job Work
 
-    // Quality
-    await updateCell({ division, range:`W${rowNumber}`, value:"" });
-    await updateCell({ division, range:`X${rowNumber}`, value:"" });
-    await updateCell({ division, range:`Y${rowNumber}`, value:"" });
+      "",
+      "",
 
-    // Wastage
-    await updateCell({ division, range:`Z${rowNumber}`, value:0 });
+      "",
+      "",
+      "", // Warping
 
-    // Rolling
-    await updateCell({ division, range:`AA${rowNumber}`, value:"" });
-    await updateCell({ division, range:`AB${rowNumber}`, value:"" });
-    await updateCell({ division, range:`AC${rowNumber}`, value:"" });
+      "",
+      "",
+      "", // Filling
 
-    // Packing
-    await updateCell({ division, range:`AD${rowNumber}`, value:"" });
-    await updateCell({ division, range:`AE${rowNumber}`, value:"" });
-    await updateCell({ division, range:`AF${rowNumber}`, value:"" });
+      "",
+      "",
+      "", // Machine
 
-    // Status
-    await updateCell({
-        division,
-        range:`AG${rowNumber}`,
-        value:"Pending",
-    });
+      "",
+      "",
+      "", // Finishing
 
-    // Nett Qty
-    await updateCell({
-        division,
-        range:`AH${rowNumber}`,
-        value:"",
-    });
+      "",
+      "",
+      "", // Quality
 
-    // Updated By
-    await updateCell({
-        division,
-        range:`AI${rowNumber}`,
-        value:"",
-    });
+      0, // Wastage Qty
 
-    // Updated Time
-    await updateCell({
-        division,
-        range:`AJ${rowNumber}`,
-        value:"",
-    });
+      "",
+      "",
+      "", // Rolling
 
-    return true;
+      "",
+      "",
+      "", // Packing
+
+      "Pending", // Status
+
+      "", // Nett Qty RTD
+
+      "", // Updated By
+
+      "", // Updated Time
+    ],
+  ];
+  const spreadSheetId = await getDatabaseByDivision(division);
+
+  await sheets.spreadsheets.values.append({
+    auth: authClient,
+    spreadsheetId: spreadSheetId,
+    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A1`,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      values,
+    },
+  });
+
+  return true;
 };
