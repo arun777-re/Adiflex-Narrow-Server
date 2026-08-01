@@ -18,21 +18,19 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 const app = express();
 
 const server = http.createServer(app);
+export const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 
 initSocket(server)
 
 
 // Middleware
 app.use(express.json());
-app.use(cors(
-
-));
+app.use(cors({
+origin:allowedOrigin,
+credentials:true
+}));
 app.use(morgan("combined"))
-console.log({
-  GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID,
-  WOVEN_DATABASE_ID: process.env.WOVEN_DATABASE_ID,
-  CROCHET_DATABASE_ID: process.env.CROCHET_DATABASE_ID,
-});
+
 // Routes
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.originalUrl}`);

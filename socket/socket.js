@@ -1,4 +1,5 @@
 import { Server } from "socket.io";
+import { allowedOrigin } from "..";
 
 let io;
 
@@ -6,7 +7,7 @@ export const initSocket = (server) => {
 
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: allowedOrigin,
       credentials: true,
     },
   });
@@ -33,6 +34,9 @@ export const initSocket = (server) => {
     socket.on("disconnect", (reason) => {
       console.log("Disconnected :", socket.id,reason);
     });
+     socket.on("error", (err) => {
+    console.log(err);
+  });
 
   });
 
