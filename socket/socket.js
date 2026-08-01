@@ -30,7 +30,7 @@ export const initSocket = (server) => {
 
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       console.log("Disconnected :", socket.id,reason);
     });
 
