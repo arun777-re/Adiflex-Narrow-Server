@@ -12,13 +12,13 @@ import dispatchRoutes from './routes/dispatchRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import fgRoutes from './routes/fgRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import { allowedOrigin } from './constants/sheetNames.js';
 
 
 
 const app = express();
 
 const server = http.createServer(app);
-export const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 
 initSocket(server)
 

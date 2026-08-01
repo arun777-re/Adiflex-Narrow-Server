@@ -1,5 +1,5 @@
 import { Server } from "socket.io";
-import { allowedOrigin } from "..";
+import { allowedOrigin } from "../constants/sheetNames";
 
 let io;
 
@@ -8,8 +8,7 @@ export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
       origin: allowedOrigin,
-      credentials: true,
-    },
+      credentials: true,    },
   });
 
   io.on("connection", (socket) => {

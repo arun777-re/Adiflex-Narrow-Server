@@ -8,3 +8,5 @@ export const SHEET_NAMES = {
     INVENTORY_SHEET:'FG_INVENTORY_MASTER',
     USERS:"Users"
 }
+
+export const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
