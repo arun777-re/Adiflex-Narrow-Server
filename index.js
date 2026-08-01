@@ -27,7 +27,7 @@ app.use(express.json());
 app.use(cors({
 origin:[
   "http://localhost:5173",
-  "https://adiflex-narrow-server-2.onrender.com/"
+  "https://adiflex-narrow.vercel.app"
 ],
 credentials:true
 }));
