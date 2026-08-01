@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import express from 'express';
+import http from 'http'
 import cors from 'cors';
+import { initSocket } from './socket/socket.js';
 import morgan from 'morgan';
 import authRoutes from './routes/authRoutes.js';
 import salesOrderRoutes from './routes/salesOrderRoutes.js';
@@ -14,6 +16,11 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 
 
 const app = express();
+
+const server = http.createServer(app);
+
+initSocket(server)
+
 
 // Middleware
 app.use(express.json());
@@ -42,6 +49,6 @@ app.use('/fg',fgRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
 	console.log(`Server is listening on port ${PORT}`);
 });

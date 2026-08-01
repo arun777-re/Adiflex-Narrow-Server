@@ -5,6 +5,7 @@ import sheets, { auth } from "../config/db.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 import { getSalesOrders } from "../services/salesOrderSheet.js";
+import { getRateFromSalesOrder } from "./salesOrderHelpers.js";
 
 const getOrderType = async (soNo, product) => {
   const rows = await getSalesOrders();
@@ -31,6 +32,7 @@ export const handleFinishedGoods = async ({
   const nettQty = manufacturedQty - wastageQty;
 
   const orderType = await getOrderType(soNo, product);
+  const rate = getRateFromSalesOrder({soNo,product});
 
   if (orderType === "Customer") {
     await appendDispatch({
@@ -39,6 +41,7 @@ export const handleFinishedGoods = async ({
         product,
         division,
         manufacturedQty,
+        rate,
         wastageQty,
         nettQty,
         0,

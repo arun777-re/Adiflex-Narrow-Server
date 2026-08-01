@@ -7,6 +7,8 @@ import {
   ALLOWED_DIVISIONS,
   updateOverallStatus,
 } from "../services/salesOrderSheet.js";
+import { getIO } from "../socket/socket.js";
+
 
 const processingRequests = new Set();
 
@@ -63,7 +65,6 @@ export const createSalesOrder = async (req, res) => {
     const normalizedDivision = products.map((item) => {
       return String(item.division).trim().toLowerCase();
     });
-    console.log("normalized division", normalizedDivision);
 
     const hasInvalidDivision = products.some(
       (item) =>
@@ -134,6 +135,7 @@ export const createSalesOrder = async (req, res) => {
           soNo,
           sku: item.skucode,
           product: item.product,
+          rate:item.finalrate,
           division: item.division,
           qty: soQty,
           location: shippinglocation,
@@ -163,6 +165,18 @@ export const createSalesOrder = async (req, res) => {
             normalizedDivision,
           );
         }
+const io = getIO();
+
+console.log('io....',io);
+const division= products[0].division;
+io.to(`production:${division.toLowerCase()}`).emit(
+  "new-sales-order",
+  {
+    soNo,
+    products,
+  }
+);
+  
           return res.status(201).json({
           success: true,
 
@@ -199,24 +213,25 @@ export const getAllSalesOrders = async (req, res) => {
 
       division: row[6] || "",
 
-      qty: Number(row[7]) || 0,
+      qty: Number(row[7]) || 0, 
 
       rate: Number(row[8]) || 0,
+      rateadjustment:Number(row[9]) || 0,
+      finalrate:Number(row[10]) || 0,
+      unit: row[11] || "",
 
-      unit: row[9] || "",
+      openingFgQty: Number(row[12]) || 0,
 
-      openingFgQty: Number(row[10]) || 0,
+      productionQty: Number(row[13]) || 0,
 
-      productionQty: Number(row[11]) || 0,
+      jobWork: row[14] === true || row[14] === "TRUE",
+      manufacturedQty: Number(row[15]) || 0,
 
-      jobWork: row[12] === true || row[12] === "TRUE",
-      manufacturedQty: Number(row[13]) || 0,
+      dispatchedQty: Number(row[16]) || 0,
 
-      dispatchedQty: Number(row[14]) || 0,
+      orderReceivedBy: row[17] || "",
 
-      orderReceivedBy: row[15] || "",
-
-      status: row[16] || "",
+      status: row[18] || "",
     }));
 
     return res.status(200).json({

@@ -9,7 +9,6 @@ export const getAdminDashboard = async (
   res
 ) => {
   try {
-console.log("hello dashboard...")
     const dashboard =
       await getAdminDashboardService();
 

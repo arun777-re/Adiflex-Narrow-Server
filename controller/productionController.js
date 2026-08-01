@@ -33,6 +33,8 @@ export const startProduction = async (req, res) => {
       division,
     });
 
+    // socket event
+    emitProductionUpdate();
     return res.status(200).json({
       success: true,
 
@@ -74,7 +76,7 @@ export const completeProduction = async (req, res) => {
 
       updatedBy,
     });
-
+  // socket event
     return res.status(200).json({
       success: true,
 
@@ -248,7 +250,7 @@ export const updateWastage = async (req, res) => {
       wastageQty,
       updatedBy,
     });
-
+  // socket event
     return res.status(200).json({
       success: true,
       message: "Wastage Updated Successfully",
@@ -288,7 +290,8 @@ export const completeQuality = async (req, res) => {
       updatedBy,
       division,
     });
-
+  // socket event
+    emitProductionUpdate();
     return res.status(200).json({
       success: true,
 
