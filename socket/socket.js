@@ -1,5 +1,4 @@
 import { Server } from "socket.io";
-import { allowedOrigin } from "../constants/sheetNames.js";
 
 let io;
 
@@ -7,7 +6,10 @@ export const initSocket = (server) => {
 
   io = new Server(server, {
     cors: {
-      origin: allowedOrigin,
+    origin:[
+  "http://localhost:5173",
+  "https://adiflex-narrow-server-2.onrender.com/"
+],
       credentials: true,    },
   });
 

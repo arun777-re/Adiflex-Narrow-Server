@@ -12,7 +12,6 @@ import dispatchRoutes from './routes/dispatchRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import fgRoutes from './routes/fgRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
-import { allowedOrigin } from './constants/sheetNames.js';
 
 
 
@@ -26,7 +25,10 @@ initSocket(server)
 // Middleware
 app.use(express.json());
 app.use(cors({
-origin:allowedOrigin,
+origin:[
+  "http://localhost:5173",
+  "https://adiflex-narrow-server-2.onrender.com/"
+],
 credentials:true
 }));
 app.use(morgan("combined"))

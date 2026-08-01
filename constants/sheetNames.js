@@ -9,4 +9,4 @@ export const SHEET_NAMES = {
     USERS:"Users"
 }
 
-export const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+
