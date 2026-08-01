@@ -1,5 +1,5 @@
 import { Server } from "socket.io";
-import { allowedOrigin } from "../constants/sheetNames";
+import { allowedOrigin } from "../constants/sheetNames.js";
 
 let io;
 
