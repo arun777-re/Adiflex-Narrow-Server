@@ -6,7 +6,8 @@ export const SHEET_NAMES = {
     WOVEN_STOCK:'FG_INVENTORY_MASTER',
     PRODUCT_SHEET:'PRODUCT_MASTER',
     INVENTORY_SHEET:'FG_INVENTORY_MASTER',
-    USERS:"Users"
+    USERS:"Users",
+    NOTIFICATIONS:"Notifications"
 }
 
 

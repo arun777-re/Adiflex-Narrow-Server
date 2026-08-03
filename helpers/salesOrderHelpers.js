@@ -8,24 +8,29 @@ export const addDirectDispatchOrder = async ({
   division,
   rate,
   qty,
+  shippinglocation,
+  billinglocation,
 }) => {
   const authClient = await auth.getClient();
 
   const now = new Date().toLocaleString();
 
   await appendDispatch({ values: [
-          soNo,        // A SO No
-          product,     // B Product
-          division,    // C Division
-          0,           // D Production Qty
+          soNo,       
+          product,   
+          division,
+          0,          
           rate,
-          0,           // E Wastage Qty
-          qty,         // F Nett Qty (RTD)
-          0,           // G Dispatch Qty
-          qty,         // H Available Qty
-          "Ready To Dispatch", // I Status
-          now,         // J Created At
-          now,         // K Updated At
+          shippinglocation, 
+          billinglocation, 
+          freight,
+          0,          
+          qty,       
+          0,          
+          qty,        
+          "Ready To Dispatch", 
+          now,        
+          now,      
       ]
       ,});
      
@@ -52,5 +57,11 @@ export const getRateFromSalesOrder = async ({ soNo, product }) => {
   }
 
   // Rate column index
-  return Number(row[5] || 0);
+  return {rate:Number(row[10] || 0),
+    freight:row[15] === "" ? 0 : Number(row[15] || 0),
+    jobWork:row[14] === "" ? 0 : Number(row[14] || 0),
+    bilinglocation:row[20] || "",
+    shippinglocation:row[21] || "",
+
+  };
 };

@@ -1,139 +1,79 @@
 import {
-
   getAllDispatchOrders,
-
   dispatchOrder,
-
 } from "../services/dispatchSheet.js";
-
 
 // =====================================================
 // GET ALL DISPATCH
 // =====================================================
 
 export const getDispatchOrders = async (
-
   req,
 
-  res
-
+  res,
 ) => {
-
   try {
-
-    const dispatchOrders =
-      await getAllDispatchOrders();
-
+    const dispatchOrders = await getAllDispatchOrders();
 
     return res.status(200).json({
-
-      success:
-        true,
+      success: true,
 
       dispatchOrders,
-
     });
-
-  }
-
-  catch (error) {
-
-    console.error(
-      "Get Dispatch Error:",
-      error
-    );
-
+  } catch (error) {
+    console.error("Get Dispatch Error:", error);
 
     return res.status(500).json({
+      success: false,
 
-      success:
-        false,
-
-      message:
-        error.message,
-
+      message: error.message,
     });
-
   }
-
 };
-
-
 
 // =====================================================
 // DISPATCH ORDER
 // =====================================================
 
-export const createDispatch = async (
 
+export const createDispatch = async (
   req,
 
-  res
-
+  res,
 ) => {
-
   try {
-
     const {
-
       soNo,
 
       product,
 
       dispatchQty,
+    } = req.body;
 
-    } =
-      req.body;
+    const result = await dispatchOrder({
+      soNo,
 
+      product,
 
-    const result =
-      await dispatchOrder({
-
-        soNo,
-
-        product,
-
-        dispatchQty,
-
-      });
-
+      dispatchQty,
+    });
 
     return res.status(200).json({
+      success: true,
 
-      success:
-        true,
+      message: "Dispatch successful",
 
-      message:
-        "Dispatch successful",
-
-      dispatch:
-        result,
-
+      dispatch: result,
     });
-
-  }
-
-  catch (error) {
-
+  } catch (error) {
     console.error(
-
       "Dispatch Order Error:",
-
-      error
-
+      error,
     );
 
-
     return res.status(400).json({
-
-      success:
-        false,
-
-      message:
-        error.message,
-
+      success: false,
+      message: error.message,
     });
-
   }
-
 };

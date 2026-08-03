@@ -32,7 +32,7 @@ export const handleFinishedGoods = async ({
   const nettQty = manufacturedQty - wastageQty;
 
   const orderType = await getOrderType(soNo, product);
-  const rate = getRateFromSalesOrder({soNo,product});
+  const {rate,shippingLocation,billingLocation,freight,jobWork} = getRateFromSalesOrder({soNo,product});
 
   if (orderType === "Customer") {
     await appendDispatch({
@@ -42,6 +42,9 @@ export const handleFinishedGoods = async ({
         division,
         manufacturedQty,
         rate,
+        shippingLocation,
+        billingLocation,
+        freight,
         wastageQty,
         nettQty,
         0,

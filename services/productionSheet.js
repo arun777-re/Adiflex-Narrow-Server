@@ -29,8 +29,6 @@ export const getProductionOrders = async (division) => {
   return response.data.values || [];
 };
 
-
-
 // JOB WORK CHECK
 const isJobWorkOrder = (row) => {
   const value = String(row[PRODUCTION_COLUMNS.JOB_WORK] || "")
@@ -387,7 +385,7 @@ export const completeProductionProcess = async ({
       );
     }
 
-    const remainingQty = targetQty - nettQtyRTD;
+    const remainingQty = targetQty - productionQty;
 
     await handleFinishedGoods({
       soNo: soNo,
@@ -398,21 +396,30 @@ export const completeProductionProcess = async ({
       updatedBy: updatedBy,
     });
     if (remainingQty > 0) {
-      await updateCell({division,
-        range:`AG${rowNumber}`,
-        value:"Cycle Completed"
-      })
-   await createNextProductionCycle({
-  division,
-  currentRow: row,
-  remainingQty,
-});
+      await updateCell({
+        division,
+        range: `AG${rowNumber}`,
+        value: "Cycle Completed",
+      });
+      await createNextProductionCycle({
+        division,
+        currentRow: row,
+        remainingQty,
+      });
     } else {
       // Close Order
       await updateCell({
         division,
         range: `AG${rowNumber}`,
         value: "Completed",
+      });
+      await sendNotification({
+        role: "dispatch",
+        division: item.division,
+        type: "sales-order",
+        title: "New Sales Order Ready for Dispatch",
+        message: `A new sales order:${soNo} is ready for dispatch`,
+        reference: soNo,
       });
     }
   }

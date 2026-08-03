@@ -2,14 +2,14 @@ import sheets from "../config/db.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { updateDispatchedQty, updateOverallStatus } from "./salesOrderSheet.js";
 
+// function to append data to dispatch sheet
 
-export const appendDispatch = async ({values}) => {
-
+export const appendDispatch = async ({ values }) => {
   if (!values) {
     throw new Error("Value is required field");
   }
 
-  const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID; 
+  const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
@@ -26,74 +26,53 @@ export const appendDispatch = async ({values}) => {
   });
 };
 
-
-
-
 // =====================================================
 // GET ALL DISPATCH ORDERS
 // =====================================================
 
 export const getAllDispatchOrders = async () => {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:N`,
+  });
 
-  const response =
-    await sheets.spreadsheets.values.get({
-
-      spreadsheetId:
-        process.env.GOOGLE_SHEET_ID,
-
-      range:
-        `${SHEET_NAMES.DISPATCH_SHEET}!A2:K`,
-
-    });
-
-
-  const rows =
-    response.data.values || [];
-
+  const rows = response.data.values || [];
 
   return rows.map((row, index) => ({
+    id: `${row[0]}-${row[1]}`,
 
-    id:
-      `${row[0]}-${row[1]}`,
+    rowNumber: index + 2,
 
-    rowNumber:
-      index + 2,
+    soNo: row[0] || "",
 
-    soNo:
-      row[0] || "",
+    product: row[1] || "",
 
-    product:
-      row[1] || "",
+    division: row[2] || "",
 
-    division:
-      row[2] || "",
+    productionQty: Number(row[3] || 0),
 
-    productionQty:
-      Number(row[3] || 0),
+    rate: Number(row[4] || 0),
 
-    wastageQty:
-      Number(row[4] || 0),
+    shippinglocation: row[5] || "",
 
-    nettQtyRTD:
-      Number(row[5] || 0),
+    billinglocation: row[6] || "",
 
-    dispatchQty:
-      Number(row[6] || 0),
+    wastageQty: Number(row[7] || 0),
 
+    nettQtyRTD: Number(row[8] || 0),
+
+    dispatchQty: Number(row[9] || 0),
+
+    // Calculated field
     availableQty:
-      Number(row[7] || 0),
+      Number(row[8] || 0) - Number(row[9] || 0),
 
-    status:
-      row[8] || "",
+    status: row[11] || "",
 
-    createdAt:
-      row[9] || "",
+    createdAt: row[12] || "",
 
-    updatedAt:
-      row[10] || "",
-
+    updatedAt: row[13] || "",
   }));
-
 };
 
 // =====================================================
@@ -101,293 +80,146 @@ export const getAllDispatchOrders = async () => {
 // =====================================================
 
 export const dispatchOrder = async ({
-
   soNo,
 
   product,
 
   dispatchQty,
-
 }) => {
-
-
   if (!soNo) {
-
-    throw new Error(
-      "SO No is required"
-    );
-
+    throw new Error("SO No is required");
   }
-
 
   if (!product) {
-
-    throw new Error(
-      "Product is required"
-    );
-
+    throw new Error("Product is required");
   }
 
+  const qty = Number(dispatchQty);
 
-  const qty =
-    Number(dispatchQty);
-
-
-  if (
-    Number.isNaN(qty) ||
-    qty <= 0
-  ) {
-
-    throw new Error(
-      "Dispatch Qty must be greater than 0"
-    );
-
+  if (Number.isNaN(qty) || qty <= 0) {
+    throw new Error("Dispatch Qty must be greater than 0");
   }
 
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-  const response =
-    await sheets.spreadsheets.values.get({
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:K`,
+  });
 
-      spreadsheetId:
-        process.env.GOOGLE_SHEET_ID,
+  const rows = response.data.values || [];
 
-      range:
-        `${SHEET_NAMES.DISPATCH_SHEET}!A2:K`,
-
-    });
-
-
-  const rows =
-    response.data.values || [];
-
-
-  const index =
-    rows.findIndex(
-
-      (row) =>
-
-        String(row[0]).trim() ===
-          String(soNo).trim() &&
-
-        String(row[1]).trim() ===
-          String(product).trim()
-
-    );
-
+  const index = rows.findIndex(
+    (row) =>
+      String(row[0]).trim() === String(soNo).trim() &&
+      String(row[1]).trim() === String(product).trim(),
+  );
 
   if (index === -1) {
+    throw new Error("Dispatch order not found");
+  }
 
+  const rowNumber = index + 2;
+
+  const nettQtyRTD = Number(rows[index][5] || 0);
+
+  const oldDispatchQty = Number(rows[index][6] || 0);
+
+  const availableQty = nettQtyRTD - oldDispatchQty;
+
+  if (qty > availableQty) {
     throw new Error(
-      "Dispatch order not found"
+      `Dispatch Qty cannot be greater than Available Qty (${availableQty})`,
     );
-
   }
 
-  const rowNumber =
-    index + 2;
+  const newDispatchQty = oldDispatchQty + qty;
 
+  const newAvailableQty = nettQtyRTD - newDispatchQty;
 
-  const nettQtyRTD =
-    Number(
-      rows[index][5] || 0
-    );
+  let status = "Ready To Dispatch";
 
-
-  const oldDispatchQty =
-    Number(
-      rows[index][6] || 0
-    );
-
-
-  const availableQty =
-    nettQtyRTD -
-    oldDispatchQty;
-
-
-  if (
-    qty >
-    availableQty
-  ) {
-
-    throw new Error(
-
-      `Dispatch Qty cannot be greater than Available Qty (${availableQty})`
-
-    );
-
+  if (newAvailableQty === 0) {
+    status = "Fully Dispatched";
+  } else if (newDispatchQty > 0) {
+    status = "Partially Dispatched";
   }
 
-
-  const newDispatchQty =
-    oldDispatchQty + qty;
-
-
-  const newAvailableQty =
-    nettQtyRTD -
-    newDispatchQty;
-
-
-  let status =
-    "Ready To Dispatch";
-
-
-  if (
-    newAvailableQty === 0
-  ) {
-
-    status =
-      "Fully Dispatched";
-
-  }
-
-  else if (
-    newDispatchQty > 0
-  ) {
-
-    status =
-      "Partially Dispatched";
-
-  }
-
-
-  const now =
-    new Date().toLocaleString();
-
+  const now = new Date().toLocaleString();
 
   // G = Dispatch Qty
   await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-    spreadsheetId:
-      process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!G${rowNumber}`,
 
-    range:
-      `${SHEET_NAMES.DISPATCH_SHEET}!G${rowNumber}`,
-
-    valueInputOption:
-      "USER_ENTERED",
+    valueInputOption: "USER_ENTERED",
 
     requestBody: {
-
-      values: [
-
-        [
-          newDispatchQty
-        ]
-
-      ],
-
+      values: [[newDispatchQty]],
     },
-
   });
 
-  // update dispatch qty into sales order sheet 
+  // update dispatch qty into sales order sheet
   await updateDispatchedQty({
-    soNo:soNo,
-    product:product,
-    dispatchedQty:newDispatchQty
+    soNo: soNo,
+    product: product,
+    dispatchedQty: newDispatchQty,
   });
 
-  // update overall status 
+  // update overall status
   await updateOverallStatus({
-    soNo:soNo,
-    product:product
+    soNo: soNo,
+    product: product,
   });
 
   // H = Available Qty
   await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-    spreadsheetId:
-      process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!H${rowNumber}`,
 
-    range:
-      `${SHEET_NAMES.DISPATCH_SHEET}!H${rowNumber}`,
-
-    valueInputOption:
-      "USER_ENTERED",
+    valueInputOption: "USER_ENTERED",
 
     requestBody: {
-
-      values: [
-
-        [
-          newAvailableQty
-        ]
-
-      ],
-
+      values: [[newAvailableQty]],
     },
-
   });
-
 
   // I = Status
   await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-    spreadsheetId:
-      process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!I${rowNumber}`,
 
-    range:
-      `${SHEET_NAMES.DISPATCH_SHEET}!I${rowNumber}`,
-
-    valueInputOption:
-      "USER_ENTERED",
+    valueInputOption: "USER_ENTERED",
 
     requestBody: {
-
-      values: [
-
-        [
-          status
-        ]
-
-      ],
-
+      values: [[status]],
     },
-
   });
-
 
   // K = Updated At
   await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-    spreadsheetId:
-      process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!K${rowNumber}`,
 
-    range:
-      `${SHEET_NAMES.DISPATCH_SHEET}!K${rowNumber}`,
-
-    valueInputOption:
-      "USER_ENTERED",
+    valueInputOption: "USER_ENTERED",
 
     requestBody: {
-
-      values: [
-
-        [
-          now
-        ]
-
-      ],
-
+      values: [[now]],
     },
-
   });
 
-
   return {
-
     soNo,
 
     product,
 
-    dispatchQty:
-      newDispatchQty,
+    dispatchQty: newDispatchQty,
 
-    availableQty:
-      newAvailableQty,
+    availableQty: newAvailableQty,
 
     status,
-
   };
-
 };

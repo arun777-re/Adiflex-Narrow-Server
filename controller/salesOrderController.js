@@ -7,8 +7,7 @@ import {
   ALLOWED_DIVISIONS,
   updateOverallStatus,
 } from "../services/salesOrderSheet.js";
-import { getIO } from "../socket/socket.js";
-
+import { sendNotification } from "../helpers/notificationHelper.js";
 
 const processingRequests = new Set();
 
@@ -92,8 +91,14 @@ export const createSalesOrder = async (req, res) => {
     const values = [];
 
     products.forEach((item) => {
-      const productionQty =Math.max(Number(item.qty) - Number(item.openingFgQty),0);
-      const status = Number(item.openingFgQty) >= Number(item.qty) ? "Ready To Dispatch" : "Pending Production";
+      const productionQty = Math.max(
+        Number(item.qty) - Number(item.openingFgQty),
+        0,
+      );
+      const status =
+        Number(item.openingFgQty) >= Number(item.qty)
+          ? "Ready To Dispatch"
+          : "Pending Production";
       values.push([
         soNo,
         date,
@@ -123,25 +128,34 @@ export const createSalesOrder = async (req, res) => {
 
     // values for production state
     const productionValues = [];
-        await appendMultipleSalesOrders(values);
+    await appendMultipleSalesOrders(values);
 
     for (let item of products) {
       const soQty = Number(item.qty);
       const openingFG = Number(item.openingFgQty);
-      const productionQty = Math.max(soQty - openingFG,0);
+      const productionQty = Math.max(soQty - openingFG, 0);
       //  Enough FG available
       if (openingFG >= soQty) {
         await addDirectDispatchOrder({
           soNo,
           sku: item.skucode,
           product: item.product,
-          rate:item.finalrate,
+          rate: item.finalrate,
           division: item.division,
           qty: soQty,
-          location: shippinglocation,
+          shippinglocation: shippinglocation,
+          billinglocation: billinglocation,
           updatedBy: orderReceivedBy,
         });
-      
+        // we are sending notification to dispatch manager when sales order is created and enough FG is available for dispatch
+        await sendNotification({
+          role: "dispatch",
+          division: item.division,
+          type: "sales-order",
+          title: "New Sales Order Ready for Dispatch",
+          message: `A new sales order:${soNo} is ready for dispatch`,
+          reference: soNo,
+        });
       } else {
         productionValues.push([
           soNo,
@@ -153,37 +167,33 @@ export const createSalesOrder = async (req, res) => {
           "",
           jobWork,
         ]);
-
-     
-     
       }
-  
     }
-       if (productionValues.length > 0) {
-          await appendSalesOrderToProductionProcess(
-            productionValues,
-            normalizedDivision,
-          );
-        }
-const io = getIO();
-
-console.log('io....',io);
-const division= products[0].division;
-io.to(`production:${division.toLowerCase()}`).emit(
-  "new-sales-order",
-  {
-    soNo,
-    products,
-  }
-);
-  
-          return res.status(201).json({
-          success: true,
-
-          message: "Sales Order Created",
-
-          soNo,
+    if (productionValues.length > 0) {
+      await appendSalesOrderToProductionProcess(
+        productionValues,
+        normalizedDivision,
+      );
+      const divisions = [...new Set(normalizedDivision)];
+      for (const division of divisions) {
+        await sendNotification({
+          role: "productionSupervisor",
+          division: division,
+          type: "sales-order",
+          title: "New Sales Order Created",
+          message: `A new sales order has been created for ${soNo}`,
+          reference: soNo,
         });
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+
+      message: "Sales Order Created",
+
+      soNo,
+    });
   } catch (error) {
     console.log("error in req:", error);
     return res.status(500).json({
@@ -213,11 +223,11 @@ export const getAllSalesOrders = async (req, res) => {
 
       division: row[6] || "",
 
-      qty: Number(row[7]) || 0, 
+      qty: Number(row[7]) || 0,
 
       rate: Number(row[8]) || 0,
-      rateadjustment:Number(row[9]) || 0,
-      finalrate:Number(row[10]) || 0,
+      rateadjustment: Number(row[9]) || 0,
+      finalrate: Number(row[10]) || 0,
       unit: row[11] || "",
 
       openingFgQty: Number(row[12]) || 0,

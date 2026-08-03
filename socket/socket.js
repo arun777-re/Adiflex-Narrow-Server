@@ -18,7 +18,7 @@ export const initSocket = (server) => {
     console.log("Client Connected :", socket.id);
 
     socket.on("join-room", ({ role, division }) => {
-
+ console.log("JOIN REQUEST:", role, division);
       if (role === "productionSupervisor") {
 
         socket.join(
@@ -27,6 +27,12 @@ export const initSocket = (server) => {
 
         console.log(
           `${socket.id} joined production:${division}`
+        );
+      }else{
+        socket.join(role);
+        
+        console.log(
+          `${socket.id} joined:${role}`
         );
       }
 

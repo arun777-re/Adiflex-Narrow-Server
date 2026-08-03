@@ -76,7 +76,9 @@ export const completeProduction = async (req, res) => {
 
       updatedBy,
     });
+
   // socket event
+  
     return res.status(200).json({
       success: true,
 
