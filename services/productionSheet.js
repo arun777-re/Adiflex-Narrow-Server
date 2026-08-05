@@ -8,6 +8,7 @@ import {
 import { appendDispatch } from "./dispatchSheet.js";
 import { handleInternalFG } from "./fgSheets.js";
 import { updateManufacturedQty } from "./salesOrderSheet.js";
+import { sendNotification } from "../helpers/notificationHelper.js";
 
 // =====================================================
 // GET PRODUCTION ORDERS
@@ -305,6 +306,9 @@ export const completeProductionProcess = async ({
 
   // PRODUCTION QTY
   if (process === firstProcess) {
+    if(row[PRODUCTION_COLUMNS.TARGET_QTY] < productionQty){
+  throw new Error("Production Qty cannot exceed Target Qty");
+}
     if (
       productionQty === undefined ||
       productionQty === null ||
@@ -385,7 +389,7 @@ export const completeProductionProcess = async ({
       );
     }
 
-    const remainingQty = targetQty - productionQty;
+    const remainingQty = targetQty - finalProductionQty;
 
     await handleFinishedGoods({
       soNo: soNo,
@@ -415,8 +419,8 @@ export const completeProductionProcess = async ({
       });
       await sendNotification({
         role: "dispatch",
-        division: item.division,
-        type: "sales-order",
+        division: division,
+        type: "dispatch-ready",
         title: "New Sales Order Ready for Dispatch",
         message: `A new sales order:${soNo} is ready for dispatch`,
         reference: soNo,

@@ -29,7 +29,7 @@ export const getSalesOrders = async () => {
         salesOrderSpreadsheetId,
 
       range:
-        `${SHEET_NAMES.SALES_MASTER}!A:P`,
+        `${SHEET_NAMES.SALES_MASTER}!A:W`,
 
     });
 
@@ -312,7 +312,7 @@ export const updateDispatchedQty = async ({
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
-    spreadsheetId,
+    spreadsheetId:process.env.GOOGLE_SHEET_ID,
     range: `${SHEET_NAMES.SALES_MASTER}!O${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
@@ -375,7 +375,7 @@ export const updateOverallStatus = async ({
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
-    spreadsheetId,
+    spreadsheetId:process.env.GOOGLE_SHEET_ID,
     range: `${SHEET_NAMES.SALES_MASTER}!Q${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {

@@ -33,8 +33,6 @@ export const startProduction = async (req, res) => {
       division,
     });
 
-    // socket event
-    emitProductionUpdate();
     return res.status(200).json({
       success: true,
 
@@ -292,8 +290,6 @@ export const completeQuality = async (req, res) => {
       updatedBy,
       division,
     });
-  // socket event
-    emitProductionUpdate();
     return res.status(200).json({
       success: true,
 

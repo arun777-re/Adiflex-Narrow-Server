@@ -1,4 +1,5 @@
 import sheets from "../config/db.js";
+import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { updateDispatchedQty, updateOverallStatus } from "./salesOrderSheet.js";
 
@@ -33,45 +34,62 @@ export const appendDispatch = async ({ values }) => {
 export const getAllDispatchOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:N`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:P`,
   });
 
   const rows = response.data.values || [];
 
   return rows.map((row, index) => ({
-    id: `${row[0]}-${row[1]}`,
+    id: `${row[DISPATCH_COLUMNS.SO_NO]}-${row[DISPATCH_COLUMNS.SKU_CODE]}`,
 
     rowNumber: index + 2,
 
-    soNo: row[0] || "",
+    soNo: row[DISPATCH_COLUMNS.SO_NO] || "",
 
-    product: row[1] || "",
+    skuCode: row[DISPATCH_COLUMNS.SKU_CODE] || "",
 
-    division: row[2] || "",
+    product: row[DISPATCH_COLUMNS.PRODUCT] || "",
 
-    productionQty: Number(row[3] || 0),
+    division: row[DISPATCH_COLUMNS.DIVISION] || "",
 
-    rate: Number(row[4] || 0),
+    productionQty: Number(
+      row[DISPATCH_COLUMNS.PRODUCTION_QTY] || 0
+    ),
 
-    shippinglocation: row[5] || "",
+    rate: Number(row[DISPATCH_COLUMNS.RATE] || 0),
 
-    billinglocation: row[6] || "",
+    shippinglocation:
+      row[DISPATCH_COLUMNS.SHIPPING_LOCATION] || "",
 
-    wastageQty: Number(row[7] || 0),
+    billinglocation:
+      row[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
 
-    nettQtyRTD: Number(row[8] || 0),
+    freight:
+      row[DISPATCH_COLUMNS.FREIGHT] || false,
 
-    dispatchQty: Number(row[9] || 0),
+    wastageQty: Number(
+      row[DISPATCH_COLUMNS.WASTAGE_QTY] || 0
+    ),
 
-    // Calculated field
-    availableQty:
-      Number(row[8] || 0) - Number(row[9] || 0),
+    nettQtyRTD: Number(
+      row[DISPATCH_COLUMNS.NETT_QTY_RTD] || 0
+    ),
 
-    status: row[11] || "",
+    dispatchQty: Number(
+      row[DISPATCH_COLUMNS.DISPATCH_QTY] || 0
+    ),
 
-    createdAt: row[12] || "",
+    availableQty: Number(
+      row[DISPATCH_COLUMNS.AVAILABLE_QTY] || 0
+    ),
 
-    updatedAt: row[13] || "",
+    status: row[DISPATCH_COLUMNS.STATUS] || "",
+
+    createdAt:
+      row[DISPATCH_COLUMNS.CREATED_AT] || "",
+
+    updatedAt:
+      row[DISPATCH_COLUMNS.UPDATED_AT] || "",
   }));
 };
 
@@ -103,15 +121,16 @@ export const dispatchOrder = async ({
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:K`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:P`,
   });
 
   const rows = response.data.values || [];
+  console.log("ROWS:", rows);
 
   const index = rows.findIndex(
     (row) =>
-      String(row[0]).trim() === String(soNo).trim() &&
-      String(row[1]).trim() === String(product).trim(),
+      String(row[DISPATCH_COLUMNS.SO_NO]).trim() === String(soNo).trim() &&
+      String(row[DISPATCH_COLUMNS.PRODUCT]).trim() === String(product).trim(),
   );
 
   if (index === -1) {

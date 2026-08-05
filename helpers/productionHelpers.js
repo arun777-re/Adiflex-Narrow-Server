@@ -32,12 +32,20 @@ export const handleFinishedGoods = async ({
   const nettQty = manufacturedQty - wastageQty;
 
   const orderType = await getOrderType(soNo, product);
-  const {rate,shippingLocation,billingLocation,freight,jobWork} = getRateFromSalesOrder({soNo,product});
-
+const {
+  rate,
+  shippingLocation,
+  billingLocation,
+  freight,
+  jobWork,
+  skucode,
+} = await getRateFromSalesOrder({ soNo, product });
+console.log("handleFinishedGoods:", {shippingLocation,billingLocation,freight,jobWork,skucode})
   if (orderType === "Customer") {
     await appendDispatch({
       values: [
         soNo,
+        skucode,
         product,
         division,
         manufacturedQty,
