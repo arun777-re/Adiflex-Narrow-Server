@@ -7,6 +7,7 @@ export const addDirectDispatchOrder = async ({
   product,
   division,
   rate,
+  freight,
   qty,
   shippinglocation,
   billinglocation,

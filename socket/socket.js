@@ -18,15 +18,15 @@ export const initSocket = (server) => {
     console.log("Client Connected :", socket.id);
 
     socket.on("join-room", ({ role, division }) => {
- console.log("JOIN REQUEST:", role, division);
+    console.log("JOIN REQUEST:", role, division);
       if (role === "productionSupervisor") {
 
         socket.join(
-          `production:${division.toLowerCase()}`
+          `productionSupervisor:${division.toLowerCase()}`
         );
 
         console.log(
-          `${socket.id} joined production:${division}`
+          `${socket.id} joined productionSupervisor:${division}`
         );
       }else{
         socket.join(role);
