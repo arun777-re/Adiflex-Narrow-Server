@@ -1,6 +1,6 @@
 import sheets, { getDatabaseByDivision, updateCell } from "../config/db.js";
 
-import { PROCESS_MAP, PRODUCTION_COLUMNS } from "../constants/processMap.js";
+import { PROCESS_MAP, PRODUCTION_COLUMNS,PRODUCTION_SHEET_COLUMNS } from "../constants/processMap.js";
 import {
   createNextProductionCycle,
   handleFinishedGoods,
@@ -137,11 +137,13 @@ const validatePreviousProcess = (row, process) => {
 // FIND PRODUCTION ORDER
 // =====================================================
 
-const findProductionOrder = (rows, soNo, product) => {
+const findProductionOrder = (rows, soNo, product,cycleID) => {
+  console.log("hsjdfhjskfh......",cycleID)
   const index = rows.findIndex(
     (row) =>
       row[PRODUCTION_COLUMNS.SO_NO] === soNo &&
-      row[PRODUCTION_COLUMNS.PRODUCT] === product,
+      row[PRODUCTION_COLUMNS.PRODUCT] === product &&
+      row[PRODUCTION_COLUMNS.CYCLE_ID] === cycleID,
   );
 
   if (index === -1) {
@@ -165,14 +167,17 @@ const findProductionOrder = (rows, soNo, product) => {
 
 export const startProductionProcess = async ({
   soNo,
+  cycleID,
   product,
   process,
   updatedBy,
   division,
 }) => {
+
   const rows = await getProductionOrders(division);
 
-  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product,cycleID);
+  console.log("rows.........",rows,"row",row,"rowNumber",rowNumber);
 
   const processMap = PROCESS_MAP[process];
 
@@ -266,6 +271,7 @@ export const startProductionProcess = async ({
 
 export const completeProductionProcess = async ({
   soNo,
+  cycleID,
 
   product,
 
@@ -279,7 +285,7 @@ export const completeProductionProcess = async ({
 }) => {
   const rows = await getProductionOrders(division);
 
-  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product,cycleID);
 
   const processMap = PROCESS_MAP[process];
 
@@ -306,9 +312,8 @@ export const completeProductionProcess = async ({
 
   // PRODUCTION QTY
   if (process === firstProcess) {
-    if(row[PRODUCTION_COLUMNS.TARGET_QTY] < productionQty){
-  throw new Error("Production Qty cannot exceed Target Qty");
-}
+    const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY])
+ 
     if (
       productionQty === undefined ||
       productionQty === null ||
@@ -322,11 +327,14 @@ export const completeProductionProcess = async ({
     if (Number.isNaN(qty) || qty <= 0) {
       throw new Error("Production Qty must be greater than 0");
     }
+       if (targetQty < qty) {
+      throw new Error("Production Qty cannot exceed Target Qty");
+    }
 
     await updateCell({
       division,
 
-      range: `G${rowNumber}`,
+      range: `${PRODUCTION_SHEET_COLUMNS.PRODUCTION_QTY}${rowNumber}`,
 
       value: qty,
     });
@@ -355,9 +363,7 @@ export const completeProductionProcess = async ({
   // UPDATED BY
   await updateCell({
     division,
-
-    range: `AI${rowNumber}`,
-
+    range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_BY}${rowNumber}`,
     value: updatedBy || "",
   });
 
@@ -365,13 +371,14 @@ export const completeProductionProcess = async ({
   await updateCell({
     division,
 
-    range: `AJ${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_TIME}${rowNumber}`,
 
     value: now,
   });
 
   // PACKING COMPLETED
   if (process === "packing") {
+    const skucode = row[PRODUCTION_COLUMNS.SKU_CODE]
     const finalProductionQty = Number(
       process === firstProcess
         ? productionQty
@@ -380,12 +387,11 @@ export const completeProductionProcess = async ({
 
     const wastageQty = Number(row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0);
 
-    const nettQtyRTD = finalProductionQty - wastageQty;
     const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY]);
 
-    if (finalProductionQty > targetQty || nettQtyRTD < 0) {
+    if (finalProductionQty > targetQty ) {
       throw new Error(
-        "Production Qty cannot exceed Target Qty/ Wastage Qty cannot be greater than production qty.",
+        "Production Qty cannot exceed Target Qty.",
       );
     }
 
@@ -393,20 +399,22 @@ export const completeProductionProcess = async ({
 
     await handleFinishedGoods({
       soNo: soNo,
+      cycleID: cycleID,
       product: product,
       division: division,
-      manufacturedQty: nettQtyRTD,
+      manufacturedQty:finalProductionQty,
       wastageQty: wastageQty,
       updatedBy: updatedBy,
     });
     if (remainingQty > 0) {
       await updateCell({
         division,
-        range: `AG${rowNumber}`,
+        range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
         value: "Cycle Completed",
       });
       await createNextProductionCycle({
         division,
+        skucode,
         currentRow: row,
         remainingQty,
       });
@@ -414,7 +422,7 @@ export const completeProductionProcess = async ({
       // Close Order
       await updateCell({
         division,
-        range: `AG${rowNumber}`,
+        range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
         value: "Completed",
       });
       await sendNotification({
@@ -437,6 +445,7 @@ export const completeProductionProcess = async ({
 
 export const completeQualityWithWastage = async ({
   soNo,
+  cycleID,
 
   product,
 
@@ -448,7 +457,7 @@ export const completeQualityWithWastage = async ({
 }) => {
   const rows = await getProductionOrders(division);
 
-  const { rowNumber, row } = findProductionOrder(rows, soNo, product);
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product, cycleID);
 
   const qualityStatus = getProcessStatus(row, "quality");
 
@@ -484,7 +493,6 @@ export const completeQualityWithWastage = async ({
     throw new Error("Wastage cannot be greater than Production Qty");
   }
 
-  const nettQtyRTD = productionQty - wastage;
 
   const now = new Date().toLocaleString();
 
@@ -492,7 +500,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `Y${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.QUALITY_END}${rowNumber}`,
 
     value: now,
   });
@@ -501,7 +509,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `X${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.QUAILTY_STATUS}${rowNumber}`,
 
     value: "Completed",
   });
@@ -510,32 +518,24 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `Z${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.WASTAGE_QTY}${rowNumber}`,
 
     value: wastage,
   });
 
-  // NETT QTY RTD
-  await updateCell({
-    division,
-
-    range: `AH${rowNumber}`,
-
-    value: nettQtyRTD,
-  });
 
   // update manufactured qty in sales_order sheet
   await updateManufacturedQty({
     soNo: soNo,
     product: product,
-    manufacturedQty: nettQtyRTD,
+    manufacturedQty:productionQty,
   });
 
   // UPDATED BY
   await updateCell({
     division,
 
-    range: `AI${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_BY}${rowNumber}`,
 
     value: updatedBy || "",
   });
@@ -544,15 +544,13 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `AJ${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_TIME}${rowNumber}`,
 
     value: now,
   });
 
   return {
     wastageQty: wastage,
-
-    nettQtyRTD,
   };
 };
 

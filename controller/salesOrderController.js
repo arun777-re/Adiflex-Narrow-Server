@@ -8,6 +8,7 @@ import {
   updateOverallStatus,
 } from "../services/salesOrderSheet.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
+import { generateNextCycleId } from "../helpers/productionHelpers.js";
 
 const processingRequests = new Set();
 
@@ -157,8 +158,10 @@ export const createSalesOrder = async (req, res) => {
           reference: soNo,
         });
       } else {
+        const cycleID = generateNextCycleId(soNo,item.skucode);
         productionValues.push([
           soNo,
+          cycleID,
           item.skucode,
           item.product,
           ordertype,

@@ -35,7 +35,6 @@ export const getDispatchOrders = async (
 // DISPATCH ORDER
 // =====================================================
 
-
 export const createDispatch = async (
   req,
 
@@ -44,7 +43,7 @@ export const createDispatch = async (
   try {
     const {
       soNo,
-
+      cycleID,
       product,
 
       dispatchQty,
@@ -52,7 +51,7 @@ export const createDispatch = async (
 
     const result = await dispatchOrder({
       soNo,
-
+      cycleID,
       product,
 
       dispatchQty,
@@ -66,10 +65,7 @@ export const createDispatch = async (
       dispatch: result,
     });
   } catch (error) {
-    console.error(
-      "Dispatch Order Error:",
-      error,
-    );
+    console.error("Dispatch Order Error:", error);
 
     return res.status(400).json({
       success: false,

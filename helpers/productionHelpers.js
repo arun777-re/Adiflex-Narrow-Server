@@ -6,6 +6,56 @@ import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 import { getSalesOrders } from "../services/salesOrderSheet.js";
 import { getRateFromSalesOrder } from "./salesOrderHelpers.js";
+import { PRODUCTION_COLUMNS } from "../constants/processMap.js";
+
+
+// =====================================================
+// PRODUCTION CYCLE HELPER
+// =====================================================
+
+export const generateNextCycleId = (
+  soNo,
+  skucode,
+  currentCycleId = null
+) => {
+  if (!soNo) {
+    throw new Error("SO No is required");
+  }
+
+  if (!skucode) {
+    throw new Error("SKU Code is required");
+  }
+
+  // ==========================================
+  // FIRST PRODUCTION CYCLE
+  // ==========================================
+
+  if (!currentCycleId) {
+    return `${soNo}-${skucode}-C1`;
+  }
+
+  // ==========================================
+  // NEXT PRODUCTION CYCLE
+  // ==========================================
+
+  const cycleMatch =
+    String(currentCycleId).match(/-C(\d+)$/);
+
+  if (!cycleMatch) {
+    throw new Error(
+      `Invalid Production Cycle ID: ${currentCycleId}`
+    );
+  }
+
+  const currentCycleNumber =
+    Number(cycleMatch[1]);
+
+  const nextCycleNumber =
+    currentCycleNumber + 1;
+
+  return `${soNo}-${skucode}-C${nextCycleNumber}`;
+};
+
 
 const getOrderType = async (soNo, product) => {
   const rows = await getSalesOrders();
@@ -21,130 +71,239 @@ const getOrderType = async (soNo, product) => {
   return order[5];
 };
 
-export const handleFinishedGoods = async ({
+export const handleFinishedGoods = async ({  
   soNo,
+  cycleID,
   product,
   division,
   manufacturedQty,
   wastageQty,
   updatedBy,
 }) => {
-  const nettQty = manufacturedQty - wastageQty;
+
+  console.log("manufactured qty", manufacturedQty, "wastage qty", wastageQty);
 
   const orderType = await getOrderType(soNo, product);
-const {
-  rate,
-  shippingLocation,
-  billingLocation,
-  freight,
-  jobWork,
-  skucode,
-} = await getRateFromSalesOrder({ soNo, product });
-console.log("handleFinishedGoods:", {shippingLocation,billingLocation,freight,jobWork,skucode})
+  const { rate, shippingLocation, billingLocation, freight, jobWork, skucode } =
+    await getRateFromSalesOrder({ soNo, product });
+  console.log("handleFinishedGoods:", {
+    shippingLocation,
+    billingLocation,
+    freight,
+    jobWork,
+    skucode,
+  });
+  const now = new Date().toLocaleString();
+  const dispatchRow = [
+    soNo,
+    skucode,
+    cycleID,
+    product,
+    division,
+    manufacturedQty,
+    rate,
+    shippingLocation,
+    billingLocation,
+    freight,
+    wastageQty,
+    0,
+    manufacturedQty,
+    "Ready To Dispatch",
+    now,
+    now,
+  ];
   if (orderType === "Customer") {
     await appendDispatch({
-      values: [
-        soNo,
-        skucode,
-        product,
-        division,
-        manufacturedQty,
-        rate,
-        shippingLocation,
-        billingLocation,
-        freight,
-        wastageQty,
-        nettQty,
-        0,
-        nettQty,
-        "Ready To Dispatch",
-        new Date().toLocaleString(),
-        new Date().toLocaleString(),
-      ],
+      values: dispatchRow,
     });
   } else {
     await handleInternalFG({
       soNo,
       product,
-      qty: nettQty,
+      qty:manufacturedQty,
       updatedBy,
     });
   }
 
-  return nettQty;
+  return true;
 };
 
 export const createNextProductionCycle = async ({
   division,
+  skucode,
   currentRow,
   remainingQty,
 }) => {
   const authClient = await auth.getClient();
 
-  // Current row se basic data uthao
-  const values = [
-    [
-      currentRow[0], // SO No
-      currentRow[1], // SKU Code
-      currentRow[2], // Product
-      currentRow[3], // Order Type
-      remainingQty, // Target Qty (Remaining)
-      currentRow[5], // Division
+  // ==========================================
+  // BASIC DATA
+  // ==========================================
 
-      "", // Production Qty
+  const soNo =
+    currentRow[PRODUCTION_COLUMNS.SO_NO];
 
-      currentRow[7], // Job Work
+  const currentCycleId =
+    currentRow[PRODUCTION_COLUMNS.CYCLE_ID];
 
-      "",
-      "",
+  // ==========================================
+  // VALIDATION
+  // ==========================================
 
-      "",
-      "",
-      "", // Warping
+  if (!soNo) {
+    throw new Error("SO No is missing");
+  }
 
-      "",
-      "",
-      "", // Filling
+  if (!currentCycleId) {
+    throw new Error("Production Cycle ID is missing");
+  }
 
-      "",
-      "",
-      "", // Machine
+  if (!remainingQty || Number(remainingQty) <= 0) {
+    throw new Error("Remaining Qty must be greater than 0");
+  }
 
-      "",
-      "",
-      "", // Finishing
+  // ==========================================
+  // NEXT CYCLE ID
+  // ==========================================
 
-      "",
-      "",
-      "", // Quality
+  const nextCycleId = generateNextCycleId(
+    soNo,
+    skucode,
+    currentCycleId
+  );
 
-      0, // Wastage Qty
+  // ==========================================
+  // NEW PRODUCTION ROW
+  // ==========================================
 
-      "",
-      "",
-      "", // Rolling
+  const values = [[
 
-      "",
-      "",
-      "", // Packing
+    // A - SO NO
+    soNo,
 
-      "Pending", // Status
+    // B - CYCLE ID
+    nextCycleId,
 
-      "", // Nett Qty RTD
+    // C - SKU CODE
+    currentRow[PRODUCTION_COLUMNS.SKU_CODE],
 
-      "", // Updated By
+    // D - PRODUCT
+    currentRow[PRODUCTION_COLUMNS.PRODUCT],
 
-      "", // Updated Time
-    ],
-  ];
-  const spreadSheetId = await getDatabaseByDivision(division);
+    // E - ORDER TYPE
+    currentRow[PRODUCTION_COLUMNS.ORDER_TYPE],
+
+    // F - TARGET QTY
+    Number(remainingQty),
+
+    // G - DIVISION
+    currentRow[PRODUCTION_COLUMNS.DIVISION],
+
+    // H - PRODUCTION QTY
+    "",
+
+    // I - JOB WORK
+    currentRow[PRODUCTION_COLUMNS.JOB_WORK],
+
+    // J - JOB WORK START
+    "",
+
+    // K - JOB WORK END
+    "",
+
+    // L - WARPING START
+    "",
+
+    // M - WARPING
+    "",
+
+    // N - WARPING END
+    "",
+
+    // O - FILLING START
+    "",
+
+    // P - FILLING
+    "",
+
+    // Q - FILLING END
+    "",
+
+    // R - MACHINE START
+    "",
+
+    // S - MACHINE
+    "",
+
+    // T - MACHINE END
+    "",
+
+    // U - FINISHING START
+    "",
+
+    // V - FINISHING
+    "",
+
+    // W - FINISHING END
+    "",
+
+    // X - QUALITY START
+    "",
+
+    // Y - QUALITY
+    "",
+
+    // Z - QUALITY END
+    "",
+
+    // AA - WASTAGE QTY
+    0,
+
+    // AB - ROLLING START
+    "",
+
+    // AC - ROLLING
+    "",
+
+    // AD - ROLLING END
+    "",
+
+    // AE - PACKING START
+    "",
+
+    // AF - PACKING
+    "",
+
+    // AG - PACKING END
+    "",
+
+    // AH - STATUS
+    "Pending",
+
+    // AI - UPDATED BY
+    "",
+
+    // AJ - UPDATED TIME
+    "",
+  ]];
+
+  // ==========================================
+  // DATABASE
+  // ==========================================
+
+  const spreadSheetId =
+    await getDatabaseByDivision(division);
 
   await sheets.spreadsheets.values.append({
     auth: authClient,
     spreadsheetId: spreadSheetId,
-    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A1`,
+
+    // A:AJ = 36 columns
+    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:AJ`,
+
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
+
     requestBody: {
       values,
     },

@@ -1,10 +1,12 @@
 import sheets, { auth } from "../config/db.js";
+import { SALES_COLUMNS } from "../constants/salesColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { appendDispatch } from "../services/dispatchSheet.js";
 import { getSalesOrders } from "../services/salesOrderSheet.js";
 
 export const addDirectDispatchOrder = async ({
   soNo,
+  cycleID,
   product,
   division,
   rate,
@@ -20,7 +22,8 @@ export const addDirectDispatchOrder = async ({
 
   await appendDispatch({ values: [
           soNo,  
-          sku,     
+          sku,    
+          cycleID, 
           product,   
           division,
           0,          
@@ -28,10 +31,9 @@ export const addDirectDispatchOrder = async ({
           shippinglocation, 
           billinglocation, 
           freight,
-          0,          
-          qty,       
-          0,          
-          qty,        
+          0,          /*wastage qty*/ 
+          0,        /*dispatch qty*/ 
+          qty,        /*available qty*/ 
           "Ready To Dispatch", 
           now,        
           now,      
@@ -48,8 +50,8 @@ export const getRateFromSalesOrder = async ({ soNo, product }) => {
   const rows = await getSalesOrders(); // SalesOrderItems ya SalesOrder sheet
   const row = rows.find(
     (item) =>
-      String(item[0]).trim() === String(soNo).trim() &&
-      String(item[4]).trim().toLowerCase() ===
+      String(item[SALES_COLUMNS.SO_NO]).trim() === String(soNo).trim() &&
+      String(item[SALES_COLUMNS.PRODUCT]).trim().toLowerCase() ===
         String(product).trim().toLowerCase()
   );
   if (!row) {
@@ -57,14 +59,14 @@ export const getRateFromSalesOrder = async ({ soNo, product }) => {
       ` SO not found ${soNo} - ${product}`
     );
   }
-console.log("billing location",row[20], "shipping location",row[21])
+console.log("billing location",row[SALES_COLUMNS.BILLING_LOCATION], "shipping location",row[SALES_COLUMNS.SHIPPING_LOCATION])
   // Rate column index
 return {
-  rate: Number(row[10] || 0),
-  freight: row[15] === "" ? false : row[15] === true || String(row[15]).toLowerCase() === "true",
-  jobWork: row[14] === "" ? false : row[14] === true || String(row[14]).toLowerCase() === "true",
-  billingLocation: row[20] || "",
-  shippingLocation: row[21] || "",
-  skucode: row[2] || "",
+  rate: Number(row[SALES_COLUMNS.RATE] || 0),
+  freight: row[SALES_COLUMNS.FREIGHT] === "" ? false : row[SALES_COLUMNS.FREIGHT] === true || String(row[SALES_COLUMNS.FREIGHT]).toLowerCase() === "true",
+  jobWork: row[SALES_COLUMNS.JOB_WORK] === "" ? false : row[SALES_COLUMNS.JOB_WORK] === true || String(row[SALES_COLUMNS.JOB_WORK]).toLowerCase() === "true",
+  billingLocation: row[SALES_COLUMNS.BILLING_LOCATION] || "",
+  shippingLocation: row[SALES_COLUMNS.SHIPPING_LOCATION] || "",
+  skucode: row[SALES_COLUMNS.SKU_CODE] || "",
 };
 };

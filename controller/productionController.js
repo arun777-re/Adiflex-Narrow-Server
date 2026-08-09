@@ -12,8 +12,7 @@ import {
 // start production process
 export const startProduction = async (req, res) => {
   try {
-    const { soNo, product, process, updatedBy, division } = req.body;
-
+    const { soNo, product, process, updatedBy, division, cycleID } = req.body;
     if (!soNo || !product || !process) {
       return res.status(400).json({
         success: false,
@@ -24,7 +23,7 @@ export const startProduction = async (req, res) => {
 
     await startProductionProcess({
       soNo,
-
+      cycleID,
       product,
 
       process,
@@ -51,8 +50,15 @@ export const startProduction = async (req, res) => {
 // complete production process
 export const completeProduction = async (req, res) => {
   try {
-    const { soNo, product, process, productionQty, updatedBy, division } =
-      req.body;
+    const {
+      soNo,
+      product,
+      process,
+      productionQty,
+      updatedBy,
+      division,
+      cycleID,
+    } = req.body;
 
     if (!soNo || !product || !process || !division) {
       return res.status(400).json({
@@ -64,6 +70,7 @@ export const completeProduction = async (req, res) => {
 
     await completeProductionProcess({
       soNo,
+      cycleID,
 
       product,
 
@@ -75,8 +82,8 @@ export const completeProduction = async (req, res) => {
       updatedBy,
     });
 
-  // socket event
-  
+    // socket event
+
     return res.status(200).json({
       success: true,
 
@@ -101,11 +108,14 @@ export const getAllProductionOrders = async (req, res) => {
 
     const data = rows.slice(1);
 
-    const productionOrders = data.map((row,index) => ({
-       rowNumber:index + 2 ,
-      id: `${row[PRODUCTION_COLUMNS.SO_NO]}-${row[PRODUCTION_COLUMNS.PRODUCT]}-${index + 2}`,
+    const productionOrders = data.map((row, index) => ({
+      rowNumber: index + 2,
+      id:
+        row[PRODUCTION_COLUMNS.CYCLE_ID] ||
+        `${row[PRODUCTION_COLUMNS.SO_NO]}-${row[PRODUCTION_COLUMNS.PRODUCT]}-${index + 2}`,
 
       soNo: row[PRODUCTION_COLUMNS.SO_NO] || "",
+      cycleID: row[PRODUCTION_COLUMNS.CYCLE_ID] || "",
 
       product: row[PRODUCTION_COLUMNS.PRODUCT] || "",
 
@@ -250,7 +260,7 @@ export const updateWastage = async (req, res) => {
       wastageQty,
       updatedBy,
     });
-  // socket event
+    // socket event
     return res.status(200).json({
       success: true,
       message: "Wastage Updated Successfully",
@@ -270,9 +280,10 @@ export const updateWastage = async (req, res) => {
 // =====================================================
 
 export const completeQuality = async (req, res) => {
-  console.log("req.body:",req.body);
+  console.log("req.body:", req.body);
   try {
-    const { soNo, product, wastageQty, updatedBy, division } = req.body;
+    const { soNo, product, wastageQty, updatedBy, division, cycleID } =
+      req.body;
     console.log("req .body", req.body);
 
     if (!soNo || !division || !product || wastageQty === undefined) {
@@ -289,16 +300,15 @@ export const completeQuality = async (req, res) => {
       wastageQty,
       updatedBy,
       division,
+      cycleID,
     });
     return res.status(200).json({
       success: true,
-
       message: "Quality Completed and Wastage Saved Successfully",
-
       data: result,
     });
   } catch (error) {
-    console.error(error)
+    console.error(error);
     return res.status(400).json({
       success: false,
 

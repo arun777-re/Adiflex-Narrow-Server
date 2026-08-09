@@ -1,5 +1,5 @@
 import sheets from "../config/db.js";
-import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
+import { DISPATCH_COLUMNS, DISPATCH_SHEET_COLUMNS } from "../constants/dispatch.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { updateDispatchedQty, updateOverallStatus } from "./salesOrderSheet.js";
 
@@ -15,7 +15,7 @@ export const appendDispatch = async ({ values }) => {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:K`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:P`,
 
     valueInputOption: "USER_ENTERED",
 
@@ -45,6 +45,7 @@ export const getAllDispatchOrders = async () => {
     rowNumber: index + 2,
 
     soNo: row[DISPATCH_COLUMNS.SO_NO] || "",
+    cycleID: row[DISPATCH_COLUMNS.CYCLE_ID] || "",
 
     skuCode: row[DISPATCH_COLUMNS.SKU_CODE] || "",
 
@@ -71,10 +72,6 @@ export const getAllDispatchOrders = async () => {
       row[DISPATCH_COLUMNS.WASTAGE_QTY] || 0
     ),
 
-    nettQtyRTD: Number(
-      row[DISPATCH_COLUMNS.NETT_QTY_RTD] || 0
-    ),
-
     dispatchQty: Number(
       row[DISPATCH_COLUMNS.DISPATCH_QTY] || 0
     ),
@@ -99,11 +96,11 @@ export const getAllDispatchOrders = async () => {
 
 export const dispatchOrder = async ({
   soNo,
-
+  cycleID,
   product,
-
   dispatchQty,
 }) => {
+  console.log("Dispatch Order:", { soNo, product, dispatchQty });
   if (!soNo) {
     throw new Error("SO No is required");
   }
@@ -120,18 +117,18 @@ export const dispatchOrder = async ({
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-
     range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:P`,
   });
 
   const rows = response.data.values || [];
-  console.log("ROWS:", rows);
 
   const index = rows.findIndex(
     (row) =>
       String(row[DISPATCH_COLUMNS.SO_NO]).trim() === String(soNo).trim() &&
-      String(row[DISPATCH_COLUMNS.PRODUCT]).trim() === String(product).trim(),
+      String(row[DISPATCH_COLUMNS.PRODUCT]).trim() === String(product).trim() && 
+      String(row[DISPATCH_COLUMNS.CYCLE_ID]).trim() === String(cycleID).trim()
   );
+  console.log("Before:", rows[index]);
 
   if (index === -1) {
     throw new Error("Dispatch order not found");
@@ -139,21 +136,28 @@ export const dispatchOrder = async ({
 
   const rowNumber = index + 2;
 
-  const nettQtyRTD = Number(rows[index][5] || 0);
+  const manufacturedQty = Number(
+    rows[index][DISPATCH_COLUMNS.AVAILABLE_QTY] || 0
+  );
 
-  const oldDispatchQty = Number(rows[index][6] || 0);
+  const oldDispatchQty = Number(
+    rows[index][DISPATCH_COLUMNS.DISPATCH_QTY] || 0
+  );
 
-  const availableQty = nettQtyRTD - oldDispatchQty;
+  const availableQty = Number(
+    rows[index][DISPATCH_COLUMNS.AVAILABLE_QTY] ||
+      (manufacturedQty - oldDispatchQty)
+  );
 
   if (qty > availableQty) {
     throw new Error(
-      `Dispatch Qty cannot be greater than Available Qty (${availableQty})`,
+      `Dispatch Qty cannot be greater than Available Qty (${availableQty})`
     );
   }
 
   const newDispatchQty = oldDispatchQty + qty;
 
-  const newAvailableQty = nettQtyRTD - newDispatchQty;
+  const newAvailableQty = availableQty - newDispatchQty;
 
   let status = "Ready To Dispatch";
 
@@ -165,80 +169,63 @@ export const dispatchOrder = async ({
 
   const now = new Date().toLocaleString();
 
-  // G = Dispatch Qty
+  // Dispatch Qty (Column L)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!G${rowNumber}`,
-
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!L${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-
     requestBody: {
       values: [[newDispatchQty]],
     },
   });
 
-  // update dispatch qty into sales order sheet
-  await updateDispatchedQty({
-    soNo: soNo,
-    product: product,
-    dispatchedQty: newDispatchQty,
-  });
-
-  // update overall status
-  await updateOverallStatus({
-    soNo: soNo,
-    product: product,
-  });
-
-  // H = Available Qty
+  // Available Qty (Column M)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!H${rowNumber}`,
-
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.AVAILABLE_QTY}${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-
     requestBody: {
       values: [[newAvailableQty]],
     },
   });
 
-  // I = Status
+  // Status (Column N)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!I${rowNumber}`,
-
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.STATUS}${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-
     requestBody: {
       values: [[status]],
     },
   });
 
-  // K = Updated At
+  // Updated At (Column P)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!K${rowNumber}`,
-
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.UPDATED_AT}${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-
     requestBody: {
       values: [[now]],
     },
   });
+  // Update Sales Order
+  await updateDispatchedQty({
+    soNo,
+    product,
+    dispatchedQty: newDispatchQty,
+  });
+
+  // Update Overall Status
+  await updateOverallStatus({
+    soNo,
+    product,
+  });
 
   return {
     soNo,
-
     product,
-
     dispatchQty: newDispatchQty,
-
     availableQty: newAvailableQty,
-
     status,
   };
 };

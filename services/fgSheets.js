@@ -1,4 +1,5 @@
 import sheets, { auth, updateCell } from "../config/db.js";
+import { SALES_COLUMNS } from "../constants/salesColumns.js";
 
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
@@ -55,8 +56,8 @@ export const handleInternalFG = async ({
 
   const salesRow = salesRows.find(
     (item) =>
-      item[0] === soNo &&
-      item[4] === product
+      item[SALES_COLUMNS.SO_NO] === soNo &&
+      item[SALES_COLUMNS.PRODUCT] === product
   );
 
   if (!salesRow) {

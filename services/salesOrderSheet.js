@@ -1,257 +1,124 @@
-
 import { auth, getDatabaseByDivision } from "../config/db.js";
 import sheets from "../config/db.js";
+import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
+import { SALES_COLUMNS ,SALES_COLUMN_LETTERS} from "../constants/salesColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
-const salesOrderSpreadsheetId =
-  process.env.GOOGLE_SHEET_ID;
+const salesOrderSpreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-  const WOVEN_SHEET_ID=process.env.WOVEN_DATABASE_ID;
+const WOVEN_SHEET_ID = process.env.WOVEN_DATABASE_ID;
 
-  export const ALLOWED_DIVISIONS = [
-    "woven",
-    "crochet"
-  ]
+export const ALLOWED_DIVISIONS = ["woven", "crochet"];
 
 // get all sales order
 export const getSalesOrders = async () => {
+  const authClient = await auth.getClient();
 
-  const authClient =
-    await auth.getClient();
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
 
+    spreadsheetId: salesOrderSpreadsheetId,
 
-  const response =
-    await sheets.spreadsheets.values.get({
+    range: `${SHEET_NAMES.SALES_MASTER}!A:W`,
+  });
 
-      auth: authClient,
-
-      spreadsheetId:
-        salesOrderSpreadsheetId,
-
-      range:
-        `${SHEET_NAMES.SALES_MASTER}!A:W`,
-
-    });
-
-
-  return (
-    response.data.values ||
-    []
-  );
-
+  return response.data.values || [];
 };
 
-
 // append sales order
-export const appendMultipleSalesOrders =
-  async (values) => {
+export const appendMultipleSalesOrders = async (values) => {
+  const authClient = await auth.getClient();
 
-    const authClient =
-      await auth.getClient();
+  await sheets.spreadsheets.values.append({
+    auth: authClient,
 
+    spreadsheetId: salesOrderSpreadsheetId,
 
-    await sheets.spreadsheets.values.append({
+    range: `${SHEET_NAMES.SALES_MASTER}!A:W`,
 
-      auth: authClient,
+    valueInputOption: "USER_ENTERED",
 
-      spreadsheetId:
-        salesOrderSpreadsheetId,
+    insertDataOption: "INSERT_ROWS",
 
-      range:
-        `${SHEET_NAMES.SALES_MASTER}!A:R`,
-
-      valueInputOption:
-        "USER_ENTERED",
-
-      insertDataOption:
-        "INSERT_ROWS",
-
-      requestBody: {
-
-        values,
-
-      },
-
-    });
-
-  };
-
+    requestBody: {
+      values,
+    },
+  });
+};
 
 // append sales order to production process according to division
-export const appendSalesOrderToProductionProcess =
-  async (
-    values,
-    division
-  ) => {
+export const appendSalesOrderToProductionProcess = async (values, division) => {
+  console.log("Appending sales order to production process for division:", values, division);
+  if (!division) {
+    throw new Error("Division is required");
+  }
 
+  const spreadsheetId = getDatabaseByDivision(division);
 
-    if (
-      !division
-    ) {
+  if (!spreadsheetId) {
+    throw new Error(`No database configured for division: ${division}`);
+  }
 
-      throw new Error(
-        "Division is required"
-      );
+  const authClient = await auth.getClient();
 
-    }
+  await sheets.spreadsheets.values.append({
+    auth: authClient,
 
+    spreadsheetId: spreadsheetId,
 
-    const spreadsheetId =
-      getDatabaseByDivision(
-        division
-      );
+    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:I`,
 
-    if (
-      !spreadsheetId
-    ) {
+    valueInputOption: "USER_ENTERED",
 
-      throw new Error(
-        `No database configured for division: ${division}`
-      );
+    insertDataOption: "INSERT_ROWS",
 
-    }
-
-
-    const authClient =
-      await auth.getClient();
-
-
-    await sheets.spreadsheets.values.append({
-
-      auth: authClient,
-
-      spreadsheetId: spreadsheetId,
-
-      range:
-        `${SHEET_NAMES.PRODUCTION_SHEET}!A:H`,
-
-      valueInputOption:
-        "USER_ENTERED",
-
-      insertDataOption:
-        "INSERT_ROWS",
-
-      requestBody: {
-
-        values,
-
-      },
-
-    });
-
-  };
-
+    requestBody: {
+      values,
+    },
+  });
+};
 
 // cancel sales order
 
-export const cancelSalesOrder =
-  async (
-    soNo
-  ) => {
+export const cancelSalesOrder = async (soNo) => {
+  const authClient = await auth.getClient();
 
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
 
-    const authClient =
-      await auth.getClient();
+    spreadsheetId: salesOrderSpreadsheetId,
 
+    range: `${SHEET_NAMES.SALES_MASTER}!A:W`,
+  });
 
-    const response =
-      await sheets.spreadsheets.values.get({
+  const rows = response.data.values || [];
 
-        auth: authClient,
+  const index = rows.findIndex((row, i) => i > 0 && row[SALES_COLUMNS.SO_NO] === soNo);
 
-        spreadsheetId:
-          salesOrderSpreadsheetId,
+  if (index === -1) {
+    throw new Error("Sales Order Not Found");
+  }
 
-        range:
-          `${SHEET_NAMES.SALES_MASTER}!A:P`,
+  const rowNumber = index + 1;
 
-      });
+  
 
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
 
-    const rows =
-      response.data.values ||
-      [];
+    spreadsheetId: salesOrderSpreadsheetId,
 
+    range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.OVERALL_STATUS}${rowNumber}`,
 
-    const index =
-      rows.findIndex(
+    valueInputOption: "USER_ENTERED",
 
-        (row, i) =>
+    requestBody: {
+      values: [["Cancelled"]],
+    },
+  });
 
-          i > 0 &&
-          row[0] === soNo
-
-      );
-
-
-    if (
-      index === -1
-    ) {
-
-      throw new Error(
-        "Sales Order Not Found"
-      );
-
-    }
-
-
-    const rowNumber =
-      index + 1;
-
-
-    // IMPORTANT:
-    // Status column is O
-    // because A:P structure:
-    //
-    // A SO No
-    // B Date
-    // C Customer
-    // D Product
-    // E Division
-    // F Qty
-    // G Rate
-    // H Unit
-    // I Opening FG Qty
-    // J Production Qty
-    // K Job Work
-    // L Manufactured Qty
-    // M Dispatched Qty
-    // N Order Received By
-    // O Overall Status
-    // P Location
-
-
-    await sheets.spreadsheets.values.update({
-
-      auth: authClient,
-
-      spreadsheetId:
-        salesOrderSpreadsheetId,
-
-      range:
-        `${SHEET_NAMES.SALES_MASTER}!O${rowNumber}`,
-
-      valueInputOption:
-        "USER_ENTERED",
-
-      requestBody: {
-
-        values: [
-
-          [
-            "Cancelled"
-          ]
-
-        ],
-
-      },
-
-    });
-
-
-    return true;
-
-  };
+  return true;
+};
 
 // ==========================================
 // UPDATE MANUFACTURED QTY
@@ -267,8 +134,8 @@ export const updateManufacturedQty = async ({
 
   const rowIndex = rows.findIndex(
     (row) =>
-      row[0] === soNo &&
-      row[4] === product
+      row[SALES_COLUMNS.SO_NO] === soNo &&
+      row[SALES_COLUMNS.PRODUCT] === product,
   );
 
   if (rowIndex === -1) {
@@ -277,8 +144,8 @@ export const updateManufacturedQty = async ({
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
-    spreadsheetId:salesOrderSpreadsheetId,
-    range: `${SHEET_NAMES.SALES_MASTER}!N${rowIndex + 1}`,
+    spreadsheetId: salesOrderSpreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.MANUFACTURED_QTY}${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[manufacturedQty]],
@@ -291,19 +158,15 @@ export const updateManufacturedQty = async ({
 // ==========================================
 // UPDATE DISPATCHED QTY
 // ==========================================
-export const updateDispatchedQty = async ({
-  soNo,
-  product,
-  dispatchedQty,
-}) => {
+export const updateDispatchedQty = async ({ soNo, product, dispatchedQty }) => {
   const authClient = await auth.getClient();
 
   const rows = await getSalesOrders();
 
   const rowIndex = rows.findIndex(
     (row) =>
-      row[0] === soNo &&
-      row[4] === product
+      row[SALES_COLUMNS.SO_NO] === soNo &&
+      row[SALES_COLUMNS.PRODUCT] === product,
   );
 
   if (rowIndex === -1) {
@@ -312,8 +175,8 @@ export const updateDispatchedQty = async ({
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
-    spreadsheetId:process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.SALES_MASTER}!O${rowIndex + 1}`,
+    spreadsheetId: salesOrderSpreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.DISPATCHED_QTY}${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[dispatchedQty]],
@@ -323,31 +186,29 @@ export const updateDispatchedQty = async ({
   return true;
 };
 
-
 // ==========================================
 // UPDATE OVERALL STATUS
 // ==========================================
-export const updateOverallStatus = async ({
-  soNo,
-  product,
-}) => {
+export const updateOverallStatus = async ({ soNo, product }) => {
   const authClient = await auth.getClient();
 
   const rows = await getSalesOrders();
 
   const rowIndex = rows.findIndex(
     (row) =>
-      row[0] === soNo &&
-      row[4] === product
+      row[SALES_COLUMNS.SO_NO] === soNo &&
+      row[SALES_COLUMNS.PRODUCT] === product,
   );
 
   if (rowIndex === -1) {
     throw new Error("Sales Order not found");
   }
 
-  const soQty = Number(rows[rowIndex][7]) || 0;
-  const manufacturedQty = Number(rows[rowIndex][13]) || 0;
-  const dispatchedQty = Number(rows[rowIndex][14]) || 0;
+  const soQty = Number(rows[rowIndex][SALES_COLUMNS.SO_QTY]) || 0;
+  const manufacturedQty =
+    Number(rows[rowIndex][SALES_COLUMNS.MANUFACTURED_QTY]) || 0;
+  const dispatchedQty =
+    Number(rows[rowIndex][SALES_COLUMNS.DISPATCHED_QTY]) || 0;
 
   let status = "Pending";
 
@@ -359,24 +220,18 @@ export const updateOverallStatus = async ({
     status = "Ready To Dispatch";
   }
 
-  if (
-    dispatchedQty > 0 &&
-    dispatchedQty < manufacturedQty
-  ) {
+  if (dispatchedQty > 0 && dispatchedQty < manufacturedQty) {
     status = "Partially Dispatched";
   }
 
-  if (
-    manufacturedQty > 0 &&
-    dispatchedQty >= manufacturedQty
-  ) {
+  if (manufacturedQty > 0 && dispatchedQty >= manufacturedQty) {
     status = "Completed";
   }
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
-    spreadsheetId:process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.SALES_MASTER}!Q${rowIndex + 1}`,
+    spreadsheetId: salesOrderSpreadsheetId,
+    range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.OVERALL_STATUS}${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[status]],
