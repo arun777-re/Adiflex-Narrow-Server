@@ -84,7 +84,7 @@ export const handleFinishedGoods = async ({
   console.log("manufactured qty", manufacturedQty, "wastage qty", wastageQty);
 
   const orderType = await getOrderType(soNo, product);
-  const { rate, shippingLocation, billingLocation, freight, jobWork, skucode } =
+  const { rate, shippingLocation, billingLocation, freight, jobWork, skucode ,partyPO,route,customer} =
     await getRateFromSalesOrder({ soNo, product });
   console.log("handleFinishedGoods:", {
     shippingLocation,
@@ -94,17 +94,24 @@ export const handleFinishedGoods = async ({
     skucode,
   });
   const now = new Date().toLocaleString();
+  // dispatch data 
   const dispatchRow = [
     soNo,
     skucode,
     cycleID,
     product,
+    customer,
+    "",
+    "",
+    partyPO,
+    route,
     division,
     manufacturedQty,
     rate,
     shippingLocation,
     billingLocation,
     freight,
+    0,
     wastageQty,
     0,
     manufacturedQty,

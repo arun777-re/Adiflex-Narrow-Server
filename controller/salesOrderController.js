@@ -27,6 +27,8 @@ export const createSalesOrder = async (req, res) => {
       shippinglocation,
       freight,
       billinglocation,
+      route,
+      partyPO,
     } = req.body;
 
     // validations
@@ -36,12 +38,12 @@ export const createSalesOrder = async (req, res) => {
       !products ||
       !products.length ||
       !shippinglocation ||
-      !billinglocation
+      !billinglocation || !route 
     ) {
       return res.status(400).json({
         success: false,
 
-        message: "Date, Customer,Products and Location are required",
+        message: "Date, Customer,Products, route and Location are required",
       });
     }
     // deduplications
@@ -144,6 +146,9 @@ export const createSalesOrder = async (req, res) => {
           rate: item.finalrate,
           division: item.division,
           qty: soQty,
+          route,
+          customer,
+          partyPO,
           shippinglocation: shippinglocation,
           billinglocation: billinglocation,
           updatedBy: orderReceivedBy,

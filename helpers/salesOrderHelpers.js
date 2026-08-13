@@ -8,6 +8,7 @@ export const addDirectDispatchOrder = async ({
   soNo,
   cycleID,
   product,
+  customer,
   division,
   rate,
   sku,
@@ -15,6 +16,8 @@ export const addDirectDispatchOrder = async ({
   qty,
   shippinglocation,
   billinglocation,
+  route,
+  partyPO="",
 }) => {
   const authClient = await auth.getClient();
 
@@ -24,13 +27,19 @@ export const addDirectDispatchOrder = async ({
           soNo,  
           sku,    
           cycleID, 
-          product,   
+          product,
+          customer,
+          "",
+          "",
+          partyPO, 
+          route,  
           division,
           0,          
           rate,
           shippinglocation, 
           billinglocation, 
           freight,
+          0,  /* freight rs must be added at the time of dispatch*/
           0,          /*wastage qty*/ 
           0,        /*dispatch qty*/ 
           qty,        /*available qty*/ 
@@ -45,7 +54,7 @@ export const addDirectDispatchOrder = async ({
 };
 
 
-
+// get information from the sales Order sheet 
 export const getRateFromSalesOrder = async ({ soNo, product }) => {
   const rows = await getSalesOrders(); // SalesOrderItems ya SalesOrder sheet
   const row = rows.find(
@@ -59,14 +68,18 @@ export const getRateFromSalesOrder = async ({ soNo, product }) => {
       ` SO not found ${soNo} - ${product}`
     );
   }
-console.log("billing location",row[SALES_COLUMNS.BILLING_LOCATION], "shipping location",row[SALES_COLUMNS.SHIPPING_LOCATION])
   // Rate column index
+  console.log("row", row[SALES_COLUMNS.FINAL_RATE]);
+
 return {
-  rate: Number(row[SALES_COLUMNS.RATE] || 0),
+  rate: Number(row[SALES_COLUMNS.FINAL_RATE] || 0),
   freight: row[SALES_COLUMNS.FREIGHT] === "" ? false : row[SALES_COLUMNS.FREIGHT] === true || String(row[SALES_COLUMNS.FREIGHT]).toLowerCase() === "true",
   jobWork: row[SALES_COLUMNS.JOB_WORK] === "" ? false : row[SALES_COLUMNS.JOB_WORK] === true || String(row[SALES_COLUMNS.JOB_WORK]).toLowerCase() === "true",
   billingLocation: row[SALES_COLUMNS.BILLING_LOCATION] || "",
   shippingLocation: row[SALES_COLUMNS.SHIPPING_LOCATION] || "",
   skucode: row[SALES_COLUMNS.SKU_CODE] || "",
+  route:row[SALES_COLUMNS.ROUTE] || "",
+  partyPO:row[SALES_COLUMNS.PARTY_PO] || "",
+  customer:row[SALES_COLUMNS.CUSTOMER] || ""
 };
 };

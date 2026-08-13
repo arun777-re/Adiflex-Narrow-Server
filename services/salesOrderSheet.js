@@ -134,13 +134,25 @@ export const updateManufacturedQty = async ({
 
   const rowIndex = rows.findIndex(
     (row) =>
-      row[SALES_COLUMNS.SO_NO] === soNo &&
-      row[SALES_COLUMNS.PRODUCT] === product,
+      String(row[SALES_COLUMNS.SO_NO]).trim() === String(soNo || "").trim() &&
+      String(row[SALES_COLUMNS.PRODUCT]).trim() === String(product || "").trim(),
   );
 
   if (rowIndex === -1) {
     throw new Error("Sales Order not found");
   }
+
+  // actual row 
+  const row = rows[rowIndex]
+  const oldManufacturedQty = Number(row[SALES_COLUMNS.MANUFACTURED_QTY]) || 0;
+
+  const qtyToAdd = Number(manufacturedQty);
+    
+  if(!Number.isFinite(qtyToAdd) || qtyToAdd <=0){
+    throw new Error("Invalid manufactured quantity");
+  }
+
+  const newManufacturedQty = oldManufacturedQty + qtyToAdd;
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
@@ -148,7 +160,7 @@ export const updateManufacturedQty = async ({
     range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.MANUFACTURED_QTY}${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[manufacturedQty]],
+      values: [[newManufacturedQty]],
     },
   });
 
@@ -165,13 +177,26 @@ export const updateDispatchedQty = async ({ soNo, product, dispatchedQty }) => {
 
   const rowIndex = rows.findIndex(
     (row) =>
-      row[SALES_COLUMNS.SO_NO] === soNo &&
-      row[SALES_COLUMNS.PRODUCT] === product,
+      String(row[SALES_COLUMNS.SO_NO]).trim() === String(soNo || "").trim() &&
+      String(row[SALES_COLUMNS.PRODUCT]).trim() === String(product || "").trim(),
   );
 
   if (rowIndex === -1) {
     throw new Error("Sales Order not found");
   }
+
+
+  const row = rows[rowIndex];
+
+  const oldDispatchedQty = row[DISPATCH_COLUMNS.DISPATCH_QTY]
+
+  const qtyToAdd = Number(dispatchedQty);
+
+  if(!Number.isFinite(qtyToAdd) || qtyToAdd <=0){
+    throw new Error("Invalid dispatched quantity");
+  }
+
+  const newDispatchedQty = oldDispatchedQty + qtyToAdd
 
   await sheets.spreadsheets.values.update({
     auth: authClient,
@@ -179,7 +204,7 @@ export const updateDispatchedQty = async ({ soNo, product, dispatchedQty }) => {
     range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.DISPATCHED_QTY}${rowIndex + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[dispatchedQty]],
+      values: [[newDispatchedQty]],
     },
   });
 

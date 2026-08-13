@@ -15,7 +15,7 @@ export const appendDispatch = async ({ values }) => {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:P`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:V`,
 
     valueInputOption: "USER_ENTERED",
 
@@ -34,7 +34,7 @@ export const appendDispatch = async ({ values }) => {
 export const getAllDispatchOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:P`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:V`,
   });
 
   const rows = response.data.values || [];
@@ -50,7 +50,9 @@ export const getAllDispatchOrders = async () => {
     skuCode: row[DISPATCH_COLUMNS.SKU_CODE] || "",
 
     product: row[DISPATCH_COLUMNS.PRODUCT] || "",
-
+    customer:row[DISPATCH_COLUMNS.CUSTOMER] || "",
+    vehicleNo:row[DISPATCH_COLUMNS.VEHICLE_NO] || "",
+    driverName:row[DISPATCH_COLUMNS.DRIVER_NAME] || "",
     division: row[DISPATCH_COLUMNS.DIVISION] || "",
 
     productionQty: Number(
@@ -58,15 +60,17 @@ export const getAllDispatchOrders = async () => {
     ),
 
     rate: Number(row[DISPATCH_COLUMNS.RATE] || 0),
-
+    
     shippinglocation:
       row[DISPATCH_COLUMNS.SHIPPING_LOCATION] || "",
+      route:row[DISPATCH_COLUMNS.ROUTE] || "",
 
     billinglocation:
       row[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
 
     freight:
       row[DISPATCH_COLUMNS.FREIGHT] || false,
+  
 
     wastageQty: Number(
       row[DISPATCH_COLUMNS.WASTAGE_QTY] || 0
@@ -99,8 +103,14 @@ export const dispatchOrder = async ({
   cycleID,
   product,
   dispatchQty,
+  freight=false,
+  freightRs=0,
+  driverName,
+  vehicleNo,
+  partyPO,
+
 }) => {
-  console.log("Dispatch Order:", { soNo, product, dispatchQty });
+  console.log("Dispatch Order:", { soNo, product, dispatchQty, freight, freightRs });
   if (!soNo) {
     throw new Error("SO No is required");
   }
@@ -115,10 +125,28 @@ export const dispatchOrder = async ({
     throw new Error("Dispatch Qty must be greater than 0");
   }
 
+ const normalizedFreight =
+  String(freight).trim().toLowerCase() === "true" || freight === true;
+
+if (normalizedFreight) {
+  if (
+    freightRs === undefined ||
+    freightRs === null ||
+    freightRs === "" ||
+    Number.isNaN(Number(freightRs)) ||
+    Number(freightRs) <= 0
+  ) {
+    throw new Error(
+      "Freight Rs must be greater than 0 when Freight Charges is Yes"
+    );
+  }
+}
+
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:P`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:V`,
   });
+
 
   const rows = response.data.values || [];
 
@@ -148,7 +176,8 @@ export const dispatchOrder = async ({
     rows[index][DISPATCH_COLUMNS.AVAILABLE_QTY] ||
       (manufacturedQty - oldDispatchQty)
   );
-
+  
+  
   if (qty > availableQty) {
     throw new Error(
       `Dispatch Qty cannot be greater than Available Qty (${availableQty})`
@@ -157,7 +186,7 @@ export const dispatchOrder = async ({
 
   const newDispatchQty = oldDispatchQty + qty;
 
-  const newAvailableQty = availableQty - newDispatchQty;
+  const newAvailableQty = availableQty - qty;
 
   let status = "Ready To Dispatch";
 
@@ -172,7 +201,7 @@ export const dispatchOrder = async ({
   // Dispatch Qty (Column L)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!L${rowNumber}`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.DISPATCH_QTY}${rowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[newDispatchQty]],
