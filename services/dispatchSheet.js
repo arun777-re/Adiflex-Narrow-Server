@@ -15,7 +15,7 @@ export const appendDispatch = async ({ values }) => {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:V`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A:W`,
 
     valueInputOption: "USER_ENTERED",
 
@@ -34,7 +34,7 @@ export const appendDispatch = async ({ values }) => {
 export const getAllDispatchOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:V`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:W`,
   });
 
   const rows = response.data.values || [];
@@ -144,7 +144,7 @@ if (normalizedFreight) {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:V`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:W`,
   });
 
 
@@ -256,5 +256,76 @@ if (normalizedFreight) {
     dispatchQty: newDispatchQty,
     availableQty: newAvailableQty,
     status,
+  };
+};
+
+export const markDispatchBillingDone = async ({
+  soNo,
+  skuCode,
+  cycleID,
+}) => {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:W`,
+  });
+
+  const rows = response.data.values || [];
+
+  const normalizedSoNo = String(soNo ?? "").trim();
+  const normalizedSkuCode = String(skuCode ?? "").trim();
+  const normalizedCycleID = String(cycleID ?? "").trim();
+
+  const index = rows.findIndex((row) => {
+    const rowSoNo = String(
+      row[DISPATCH_COLUMNS.SO_NO] ?? ""
+    ).trim();
+
+    const rowSkuCode = String(
+      row[DISPATCH_COLUMNS.SKU_CODE] ?? ""
+    ).trim();
+
+    const rowCycleID = String(
+      row[DISPATCH_COLUMNS.CYCLE_ID] ?? ""
+    ).trim();
+
+    return (
+      rowSoNo === normalizedSoNo &&
+      rowSkuCode === normalizedSkuCode &&
+      rowCycleID === normalizedCycleID
+    );
+  });
+
+  if (index === -1) {
+    throw new Error("Dispatch order not found");
+  }
+
+  const rowNumber = index + 2;
+
+  // Already billed
+  const currentBilling = String(
+    rows[index][DISPATCH_COLUMNS.BILLING] ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (currentBilling === "done") {
+    throw new Error("Billing is already Done");
+  }
+
+  // Billing = Done
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!U${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [["Done"]],
+    },
+  });
+
+  return {
+    soNo,
+    skuCode,
+    cycleID: normalizedCycleID,
+    billing: "Done",
   };
 };

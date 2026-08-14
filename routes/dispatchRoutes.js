@@ -6,6 +6,7 @@ import {
 
   createDispatch,
   getAllCompletedDispatchOrders,
+  billingDone,
 
 } from "../controller/dispatchController.js";
 
@@ -33,11 +34,18 @@ router.post(
 
 );
 // Completed dispatch orders 
-router.post(
+router.get(
 
   "/completed",
 
   getAllCompletedDispatchOrders
+
+);
+router.post(
+
+  "/billing",
+
+  billingDone
 
 );
 

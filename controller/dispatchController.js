@@ -1,6 +1,10 @@
+import sheets from "../config/db.js";
+import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 import {
   getAllDispatchOrders,
   dispatchOrder,
+  markDispatchBillingDone,
 } from "../services/dispatchSheet.js";
 
 // =====================================================
@@ -53,17 +57,17 @@ export const createDispatch = async (
       partyPO,
     } = req.body;
 
-    if(!driverName?.trim()){
-       throw new Error("Driver Name is required");
+    if (!driverName?.trim()) {
+      throw new Error("Driver Name is required");
     }
-    if(!vehicleNo?.trim()){
-       throw new Error("Vehicle No is required");
+    if (!vehicleNo?.trim()) {
+      throw new Error("Vehicle No is required");
     }
-    if(!soNo?.trim()){
-       throw new Error("SoNo is required");
+    if (!soNo?.trim()) {
+      throw new Error("SoNo is required");
     }
-    if(!product?.trim()){
-       throw new Error("SoNo is required");
+    if (!product?.trim()) {
+      throw new Error("SoNo is required");
     }
     if (
       dispatchQty === undefined ||
@@ -73,8 +77,8 @@ export const createDispatch = async (
     ) {
       throw new Error("Dispatch Qty must be greater than 0");
     }
-    if(!customer?.trim()){
-       throw new Error("SoNo is required");
+    if (!customer?.trim()) {
+      throw new Error("SoNo is required");
     }
 
     const result = await dispatchOrder({
@@ -104,10 +108,9 @@ export const createDispatch = async (
   }
 };
 
-
-
 export const getAllCompletedDispatchOrders = async (req, res) => {
   try {
+    console.log("gellleeee");
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:V`,
@@ -130,58 +133,73 @@ export const getAllCompletedDispatchOrders = async (req, res) => {
         route: row[DISPATCH_COLUMNS.ROUTE] || "",
         division: row[DISPATCH_COLUMNS.DIVISION] || "",
 
-        productionQty:
-          Number(row[DISPATCH_COLUMNS.PRODUCTION_QTY]) || 0,
+        productionQty: Number(row[DISPATCH_COLUMNS.PRODUCTION_QTY]) || 0,
 
-        rate:
-          Number(row[DISPATCH_COLUMNS.RATE]) || 0,
+        rate: Number(row[DISPATCH_COLUMNS.RATE]) || 0,
 
-        shippinglocation:
-          row[DISPATCH_COLUMNS.SHIPPING_LOCATION] || "",
+        shippinglocation: row[DISPATCH_COLUMNS.SHIPPING_LOCATION] || "",
 
-        billinglocation:
-          row[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
+        billinglocation: row[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
 
-        freight:
-          row[DISPATCH_COLUMNS.FREIGHT_CHARGES] || false,
+        freight: row[DISPATCH_COLUMNS.FREIGHT_CHARGES] || false,
 
-        freightRs:
-          Number(row[DISPATCH_COLUMNS.FREIGHT_RS]) || 0,
+        freightRs: Number(row[DISPATCH_COLUMNS.FREIGHT_RS]) || 0,
 
-        wastageQty:
-          Number(row[DISPATCH_COLUMNS.WASTAGE_QTY]) || 0,
+        wastageQty: Number(row[DISPATCH_COLUMNS.WASTAGE_QTY]) || 0,
 
-        dispatchQty:
-          Number(row[DISPATCH_COLUMNS.DISPATCH_QTY]) || 0,
+        dispatchQty: Number(row[DISPATCH_COLUMNS.DISPATCH_QTY]) || 0,
 
-        availableQty:
-          Number(row[DISPATCH_COLUMNS.AVAILABLE_QTY]) || 0,
+        availableQty: Number(row[DISPATCH_COLUMNS.AVAILABLE_QTY]) || 0,
 
-        status:
-          row[DISPATCH_COLUMNS.STATUS] || "",
+        status: row[DISPATCH_COLUMNS.STATUS] || "",
+        billing: row[DISPATCH_COLUMNS.BILLING] || "",
 
-        createdAt:
-          row[DISPATCH_COLUMNS.CREATED_AT] || "",
+        createdAt: row[DISPATCH_COLUMNS.CREATED_AT] || "",
 
-        updatedAt:
-          row[DISPATCH_COLUMNS.UPDATED_AT] || "",
+        updatedAt: row[DISPATCH_COLUMNS.UPDATED_AT] || "",
       }))
-      .filter(
-        (order) =>
-          String(order.status).trim().toLowerCase() ===
-          "fully dispatched"
-      );
+      .filter((order) => {
+        const status = String(order.status).trim().toLowerCase();
+        return (
+          status === "fully dispatched" || status === "partially dispatched"
+        );
+      });
 
     return res.status(200).json({
       success: true,
       completedDispatchOrders: completedOrders,
     });
-
   } catch (error) {
-    console.error(
-      "Get Completed Dispatch Orders Error:",
-      error
-    );
+    console.error("Get Completed Dispatch Orders Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const billingDone = async (req, res) => {
+  try {
+    const { soNo, cycleID, skuCode } = req.body;
+    if (!soNo || !skuCode) {
+      throw new Error("Sku code and SO No is mandotary fields");
+    }
+
+    const response = await markDispatchBillingDone({ soNo, skuCode, cycleID });
+    if (response.billing !== "Done") {
+      return res.status(400).json({
+        success: false,
+        message: "Billing not done",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Billing done successfully",
+    });
+  } catch (error) {
+    console.error("Get Completed Dispatch Orders Error:", error);
 
     return res.status(500).json({
       success: false,
