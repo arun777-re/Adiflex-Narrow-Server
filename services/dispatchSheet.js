@@ -1,7 +1,8 @@
-import sheets from "../config/db.js";
+import sheets, { updateCell } from "../config/db.js";
 import { DISPATCH_COLUMNS, DISPATCH_SHEET_COLUMNS } from "../constants/dispatch.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
-import { updateDispatchedQty, updateOverallStatus } from "./salesOrderSheet.js";
+import { appendBillingOrder } from "./billingService.js";
+import { getSalesOrders, updateDispatchedQty, updateOverallStatus, updateSalesOrderAfterDispatch } from "./salesOrderSheet.js";
 
 // function to append data to dispatch sheet
 
@@ -69,7 +70,7 @@ export const getAllDispatchOrders = async () => {
       row[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
 
     freight:
-      row[DISPATCH_COLUMNS.FREIGHT] || false,
+      row[DISPATCH_COLUMNS.FREIGHT_CHARGES] || false,
   
 
     wastageQty: Number(
@@ -103,14 +104,26 @@ export const dispatchOrder = async ({
   cycleID,
   product,
   dispatchQty,
-  freight=false,
-  freightRs=0,
+  freight = false,
+  freightRs = 0,
   driverName,
   vehicleNo,
   partyPO,
-
 }) => {
-  console.log("Dispatch Order:", { soNo, product, dispatchQty, freight, freightRs });
+  console.time("Dispatch Starts");
+
+  console.log("Dispatch Order:", {
+    soNo,
+    product,
+    dispatchQty,
+    freight,
+    freightRs,
+  });
+
+  // =====================================================
+  // VALIDATIONS
+  // =====================================================
+
   if (!soNo) {
     throw new Error("SO No is required");
   }
@@ -121,66 +134,83 @@ export const dispatchOrder = async ({
 
   const qty = Number(dispatchQty);
 
-  if (Number.isNaN(qty) || qty <= 0) {
+  if (!Number.isFinite(qty) || qty <= 0) {
     throw new Error("Dispatch Qty must be greater than 0");
   }
 
- const normalizedFreight =
-  String(freight).trim().toLowerCase() === "true" || freight === true;
+  const normalizedFreight =
+    String(freight).trim().toLowerCase() === "true" || freight === true;
 
-if (normalizedFreight) {
-  if (
-    freightRs === undefined ||
-    freightRs === null ||
-    freightRs === "" ||
-    Number.isNaN(Number(freightRs)) ||
-    Number(freightRs) <= 0
-  ) {
-    throw new Error(
-      "Freight Rs must be greater than 0 when Freight Charges is Yes"
-    );
+  if (normalizedFreight) {
+    if (
+      freightRs === undefined ||
+      freightRs === null ||
+      freightRs === "" ||
+      !Number.isFinite(Number(freightRs)) ||
+      Number(freightRs) <= 0
+    ) {
+      throw new Error(
+        "Freight Rs must be greater than 0 when Freight Charges is Yes",
+      );
+    }
   }
-}
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:W`,
-  });
+  // =====================================================
+  // READ DISPATCH + SALES ORDER IN PARALLEL
+  // =====================================================
 
+  console.time("⏱️ READ");
 
-  const rows = response.data.values || [];
+  const [dispatchResponse, salesRows] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:T`,
+    }),
+
+    getSalesOrders(),
+  ]);
+
+  console.timeEnd("⏱️ READ");
+
+  const rows = dispatchResponse.data.values || [];
+
+  // =====================================================
+  // FIND DISPATCH ROW
+  // =====================================================
 
   const index = rows.findIndex(
     (row) =>
-      String(row[DISPATCH_COLUMNS.SO_NO]).trim() === String(soNo).trim() &&
-      String(row[DISPATCH_COLUMNS.PRODUCT]).trim() === String(product).trim() && 
-      String(row[DISPATCH_COLUMNS.CYCLE_ID]).trim() === String(cycleID).trim()
+      String(row[DISPATCH_COLUMNS.SO_NO] || "").trim() ===
+        String(soNo || "").trim() &&
+      String(row[DISPATCH_COLUMNS.PRODUCT] || "").trim() ===
+        String(product || "").trim() &&
+      String(row[DISPATCH_COLUMNS.CYCLE_ID] || "").trim() ===
+        String(cycleID || "").trim(),
   );
-  console.log("Before:", rows[index]);
 
   if (index === -1) {
     throw new Error("Dispatch order not found");
   }
 
+  const dispatchRow = rows[index];
+
+  console.log("Before:", dispatchRow);
+
   const rowNumber = index + 2;
 
-  const manufacturedQty = Number(
-    rows[index][DISPATCH_COLUMNS.AVAILABLE_QTY] || 0
-  );
+  // =====================================================
+  // DISPATCH CALCULATIONS
+  // =====================================================
 
-  const oldDispatchQty = Number(
-    rows[index][DISPATCH_COLUMNS.DISPATCH_QTY] || 0
-  );
+  const oldDispatchQty =
+    Number(dispatchRow[DISPATCH_COLUMNS.DISPATCH_QTY]) || 0;
 
-  const availableQty = Number(
-    rows[index][DISPATCH_COLUMNS.AVAILABLE_QTY] ||
-      (manufacturedQty - oldDispatchQty)
-  );
-  
-  
+  const availableQty =
+    Number(dispatchRow[DISPATCH_COLUMNS.AVAILABLE_QTY]) || 0;
+
   if (qty > availableQty) {
     throw new Error(
-      `Dispatch Qty cannot be greater than Available Qty (${availableQty})`
+      `Dispatch Qty cannot be greater than Available Qty (${availableQty})`,
     );
   }
 
@@ -198,57 +228,92 @@ if (normalizedFreight) {
 
   const now = new Date().toLocaleString();
 
-  // Dispatch Qty (Column L)
-  await sheets.spreadsheets.values.update({
+  // =====================================================
+  // DISPATCH SHEET BATCH UPDATE
+  // =====================================================
+
+  console.time("⏱️ Dispatch Sheet Update");
+
+  await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.DISPATCH_QTY}${rowNumber}`,
-    valueInputOption: "USER_ENTERED",
+
     requestBody: {
-      values: [[newDispatchQty]],
+      valueInputOption: "USER_ENTERED",
+
+      data: [
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.DISPATCH_QTY}${rowNumber}`,
+          values: [[newDispatchQty]],
+        },
+
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.AVAILABLE_QTY}${rowNumber}`,
+          values: [[newAvailableQty]],
+        },
+
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.DRIVER_NAME}${rowNumber}`,
+          values: [[driverName]],
+        },
+
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.VEHICLE_NO}${rowNumber}`,
+          values: [[vehicleNo]],
+        },
+
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.STATUS}${rowNumber}`,
+          values: [[status]],
+        },
+
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.UPDATED_AT}${rowNumber}`,
+          values: [[now]],
+        },
+
+        ...(normalizedFreight
+          ? [
+              {
+                range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.FREIGHT_RS}${rowNumber}`,
+                values: [[freightRs]],
+              },
+            ]
+          : []),
+      ],
     },
   });
 
-  // Available Qty (Column M)
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.AVAILABLE_QTY}${rowNumber}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[newAvailableQty]],
-    },
-  });
+  console.timeEnd("⏱️ Dispatch Sheet Update");
 
-  // Status (Column N)
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.STATUS}${rowNumber}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[status]],
-    },
-  });
+  // =====================================================
+  // SALES ORDER UPDATE
+  // =====================================================
 
-  // Updated At (Column P)
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.UPDATED_AT}${rowNumber}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[now]],
-    },
-  });
-  // Update Sales Order
-  await updateDispatchedQty({
+  console.time("⏱️ Sales Order Update");
+
+  await updateSalesOrderAfterDispatch({
     soNo,
     product,
-    dispatchedQty: newDispatchQty,
+    dispatchedQty: qty,
+    salesRows, // 👈 IMPORTANT
   });
 
-  // Update Overall Status
-  await updateOverallStatus({
-    soNo,
-    product,
-  });
+  console.timeEnd("⏱️ Sales Order Update");
+
+appendBillingOrder({
+  soNo,
+  skuCode: dispatchRow[DISPATCH_COLUMNS.SKU_CODE],
+  cycleID,
+  product,
+  customer: dispatchRow[DISPATCH_COLUMNS.CUSTOMER],
+  partyPO: dispatchRow[DISPATCH_COLUMNS.PARTY_PO],
+  route: dispatchRow[DISPATCH_COLUMNS.ROUTE],
+  division: dispatchRow[DISPATCH_COLUMNS.DIVISION],
+  dispatchQty: qty,
+}).catch((error) => {
+  console.error("❌ Billing append failed:", error);
+});
+  console.timeEnd("Dispatch Starts");
 
   return {
     soNo,

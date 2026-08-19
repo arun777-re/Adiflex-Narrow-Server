@@ -7,7 +7,8 @@ export const SHEET_NAMES = {
     PRODUCT_SHEET:'PRODUCT_MASTER',
     INVENTORY_SHEET:'FG_INVENTORY_MASTER',
     USERS:"Users",
-    NOTIFICATIONS:"Notifications"
+    NOTIFICATIONS:"Notifications",
+    BILLING_SHEET:"BILLING_SHEET"
 }
 
 

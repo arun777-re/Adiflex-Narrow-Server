@@ -1,4 +1,4 @@
-import { auth, getDatabaseByDivision } from "../config/db.js";
+import { auth, getDatabaseByDivision, updateCell } from "../config/db.js";
 import sheets from "../config/db.js";
 import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
 import { SALES_COLUMNS ,SALES_COLUMN_LETTERS} from "../constants/salesColumns.js";
@@ -290,3 +290,102 @@ export const getLastSalesOrderNumber = async () => {
 
   return `ANF${String(number + 1).padStart(5, "0")}`;
 }
+
+
+// ==========================================
+// UPDATE SALES ORDER AFTER DISPATCH
+// ==========================================
+
+export const updateSalesOrderAfterDispatch = async ({
+  soNo,
+  product,
+  dispatchedQty,
+  salesRows,
+}) => {
+  const rows = salesRows || [];
+
+  const rowIndex = rows.findIndex(
+    (row) =>
+      String(row[SALES_COLUMNS.SO_NO] || "").trim() ===
+        String(soNo || "").trim() &&
+      String(row[SALES_COLUMNS.PRODUCT] || "").trim() ===
+        String(product || "").trim(),
+  );
+
+  if (rowIndex === -1) {
+    throw new Error("Sales Order not found");
+  }
+
+  const row = rows[rowIndex];
+
+  const qtyToAdd = Number(dispatchedQty);
+
+  if (!Number.isFinite(qtyToAdd) || qtyToAdd <= 0) {
+    throw new Error("Invalid dispatched quantity");
+  }
+
+  const soQty =
+    Number(row[SALES_COLUMNS.SO_QTY]) || 0;
+
+  const manufacturedQty =
+    Number(row[SALES_COLUMNS.MANUFACTURED_QTY]) || 0;
+
+  const oldDispatchedQty =
+    Number(row[SALES_COLUMNS.DISPATCHED_QTY]) || 0;
+
+  const newDispatchedQty =
+    oldDispatchedQty + qtyToAdd;
+
+  let status = "Pending";
+
+  if (manufacturedQty > 0) {
+    status = "In Production";
+  }
+
+  if (manufacturedQty >= soQty && soQty > 0) {
+    status = "Ready To Dispatch";
+  }
+
+  if (
+    newDispatchedQty > 0 &&
+    newDispatchedQty < manufacturedQty
+  ) {
+    status = "Partially Dispatched";
+  }
+
+  if (
+    manufacturedQty > 0 &&
+    newDispatchedQty >= manufacturedQty
+  ) {
+    status = "Completed";
+  }
+
+  // ==========================================
+  // BATCH UPDATE
+  // ==========================================
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: salesOrderSpreadsheetId,
+
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+
+      data: [
+        {
+          range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.DISPATCHED_QTY}${rowIndex + 1}`,
+          values: [[newDispatchedQty]],
+        },
+
+        {
+          range: `${SHEET_NAMES.SALES_MASTER}!${SALES_COLUMN_LETTERS.OVERALL_STATUS}${rowIndex + 1}`,
+          values: [[status]],
+        },
+      ],
+    },
+  });
+
+  return {
+    dispatchedQty: newDispatchedQty,
+    status,
+  };
+};

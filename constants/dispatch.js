@@ -28,7 +28,10 @@ export const DISPATCH_COLUMNS = {
 
 export const DISPATCH_SHEET_COLUMNS = {
   DISPATCH_QTY: "R",
+  DRIVER_NAME:"F",
   AVAILABLE_QTY: "S",
   STATUS: "T",
-  UPDATED_AT: "W"
+  UPDATED_AT: "W",
+  VEHICLE_NO:"G",
+  FREIGHT_RS:"P"
 };
