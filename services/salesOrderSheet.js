@@ -2,11 +2,13 @@ import { auth, getDatabaseByDivision } from "../config/db.js";
 import sheets from "../config/db.js";
 import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
 import { SALES_COLUMNS ,SALES_COLUMN_LETTERS} from "../constants/salesColumns.js";
-import { SHEET_NAMES } from "../constants/sheetNames.js";
+import { SHEET_NAMES,SHEETS_FROM_ENV_ID } from "../constants/sheetNames.js";
 
 const salesOrderSpreadsheetId = process.env.GOOGLE_SHEET_ID;
 
 const WOVEN_SHEET_ID = process.env.WOVEN_DATABASE_ID;
+
+
 
 export const ALLOWED_DIVISIONS = ["woven", "crochet"];
 
@@ -265,3 +267,26 @@ export const updateOverallStatus = async ({ soNo, product }) => {
 
   return status;
 };
+
+// get last sales order no for generate so number
+export const getLastSalesOrderNumber = async () => {
+  const authClient = await auth.getClient();
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId:`${salesOrderSpreadsheetId}`,
+    range: `${SHEET_NAMES.SALES_MASTER}!A:A`,
+  });
+
+  const rows = response.data.values || [];
+
+  if (rows.length <= 1) {
+    return "ANF00001";
+  }
+
+  const lastSo = rows[rows.length - 1][0];
+
+  const number =
+    parseInt(String(lastSo).replace("ANF", ""), 10) || 0;
+
+  return `ANF${String(number + 1).padStart(5, "0")}`;
+}

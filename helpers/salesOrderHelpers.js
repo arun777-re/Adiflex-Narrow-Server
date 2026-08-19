@@ -2,7 +2,16 @@ import sheets, { auth } from "../config/db.js";
 import { SALES_COLUMNS } from "../constants/salesColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { appendDispatch } from "../services/dispatchSheet.js";
+import { findFGStockBySKU } from "../services/fgSheets.js";
+import { getProductBySkuService } from "../services/productSheet.js";
 import { getSalesOrders } from "../services/salesOrderSheet.js";
+
+// ==========================================
+// REQUEST LEVEL CACHE
+// ==========================================
+
+const productCache = new Map();
+export const fgCache = new Map();
 
 export const addDirectDispatchOrder = async ({
   soNo,
@@ -44,6 +53,7 @@ export const addDirectDispatchOrder = async ({
           0,        /*dispatch qty*/ 
           qty,        /*available qty*/ 
           "Ready To Dispatch", 
+          "",
           now,        
           now,      
       ]
@@ -51,6 +61,44 @@ export const addDirectDispatchOrder = async ({
      
 
   return true;
+};
+
+export const getProductMasterCached = async (sku) => {
+  if (!sku) {
+    throw new Error("SKU is required");
+  }
+
+  // Already fetched
+  if (productCache.has(sku)) {
+    return productCache.get(sku);
+  }
+
+  // First request
+  const productPromise = getProductBySkuService(sku);
+
+  // Store Promise itself
+  productCache.set(sku, productPromise);
+
+  return productPromise;
+};
+
+export const getFGCached = async (sku) => {
+  if (!sku) {
+    throw new Error("SKU is required");
+  }
+
+  // Already fetched / cached
+  if (fgCache.has(sku)) {
+    return fgCache.get(sku);
+  }
+
+  // First request
+  const fgStock = await findFGStockBySKU(sku);
+
+  // Store actual data
+  fgCache.set(sku, fgStock);
+
+  return fgStock;
 };
 
 
@@ -82,4 +130,39 @@ return {
   partyPO:row[SALES_COLUMNS.PARTY_PO] || "",
   customer:row[SALES_COLUMNS.CUSTOMER] || ""
 };
+};
+
+
+// CONVERT SO QTY TO METER 
+export const convertToMeter = ({
+  qty,
+  unit,
+  basicUnit,
+  meterPerRoll,
+  meterPerKg,
+}) => {
+  const normalizedUnit = String(unit).trim().toUpperCase();
+  const normalizedBasicUnit = String(basicUnit).trim().toUpperCase();
+
+  if (normalizedUnit === "METER") {
+    return qty;
+  }
+
+  if (normalizedUnit === "ROLL") {
+    if (!meterPerRoll) {
+      throw new Error("METER/ROLL conversion is missing");
+    }
+
+    return qty * Number(meterPerRoll);
+  }
+
+  if (normalizedUnit === "KG") {
+    if (!meterPerKg) {
+      throw new Error("METER/KG conversion is missing");
+    }
+
+    return qty * Number(meterPerKg);
+  }
+
+  throw new Error(`Unsupported unit: ${unit}`);
 };

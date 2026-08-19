@@ -41,29 +41,22 @@ export const getDatabaseByDivision = (division)=>{
 // update cell function
 export const updateCell = async ({
   division,
+  spreadsheetId,
+  sheetName = "Production_Process",
   range,
   value,
 }) => {
 
-  if (!division) {
-    throw new Error("Division is required");
-  }
-
   const SPREADSHEET_ID =
-    getDatabaseByDivision(division);
+    spreadsheetId || getDatabaseByDivision(division);
 
   await sheets.spreadsheets.values.update({
-
     spreadsheetId: SPREADSHEET_ID,
-
-    range: `Production_Process!${range}`,
-
+    range: `${sheetName}!${range}`,
     valueInputOption: "USER_ENTERED",
-
     requestBody: {
       values: [[value]],
     },
-
   });
 
 };

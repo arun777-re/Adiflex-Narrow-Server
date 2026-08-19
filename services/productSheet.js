@@ -13,7 +13,7 @@ export const getProductsService = async () => {
   const response = await sheets.spreadsheets.values.get({
     auth: authClient,
     spreadsheetId,
-    range: `${SHEET_NAMES.PRODUCT_SHEET}!A:L`,
+    range: `${SHEET_NAMES.PRODUCT_SHEET}!A:M`,
   });
 
   const rows = response.data.values || [];
@@ -30,6 +30,8 @@ export const getProductsService = async () => {
     division: row[PRODUCT_COLUMNS.DIVISION] || "",
     unit: row[PRODUCT_COLUMNS.UNIT] || "",
     color: row[PRODUCT_COLUMNS.COLOR] || "",
+    meterPerRoll:row[PRODUCT_COLUMNS.METERPERROLL],
+    meterPerKG:row[PRODUCT_COLUMNS.METERPERKG],
     size: row[PRODUCT_COLUMNS.SIZE] || "",
     status: row[PRODUCT_COLUMNS.STATUS] || "",
     createdBy: row[PRODUCT_COLUMNS.CREATED_BY] || "",

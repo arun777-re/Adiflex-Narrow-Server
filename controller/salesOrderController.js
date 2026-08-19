@@ -1,4 +1,9 @@
-import { addDirectDispatchOrder } from "../helpers/salesOrderHelpers.js";
+import {
+  addDirectDispatchOrder,
+  convertToMeter,
+  getFGCached,
+  getProductMasterCached,
+} from "../helpers/salesOrderHelpers.js";
 import {
   getSalesOrders,
   appendMultipleSalesOrders,
@@ -6,16 +11,24 @@ import {
   appendSalesOrderToProductionProcess,
   ALLOWED_DIVISIONS,
   updateOverallStatus,
+  getLastSalesOrderNumber,
 } from "../services/salesOrderSheet.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
 import { generateNextCycleId } from "../helpers/productionHelpers.js";
+import { consumeFGStockService, findFGStockBySKU } from "../services/fgSheets.js";
+import { getProductBySkuService } from "../services/productSheet.js";
 
 const processingRequests = new Set();
 
-// create sales order
+// =====================================================
+// CREATE SALES ORDER
+// =====================================================
 export const createSalesOrder = async (req, res) => {
   console.log("req", req.body);
+  console.time("🔥 TOTAL createSalesOrder");
+
   let requestKey;
+
   try {
     const {
       date,
@@ -31,26 +44,41 @@ export const createSalesOrder = async (req, res) => {
       partyPO,
     } = req.body;
 
-    // validations
+    // =====================================================
+    // VALIDATIONS
+    // =====================================================
+
     if (
       !date ||
       !customer ||
-      !products ||
-      !products.length ||
+      !products?.length ||
       !shippinglocation ||
-      !billinglocation || !route 
+      !billinglocation ||
+      !route
     ) {
       return res.status(400).json({
         success: false,
-
-        message: "Date, Customer,Products, route and Location are required",
+        message: "Date, Customer, Products, Route and Location are required",
       });
     }
-    // deduplications
+
+    const normalizedOrderType = String(ordertype).trim().toUpperCase();
+
+    if (!["CUSTOMER", "INTERNAL"].includes(normalizedOrderType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Order Type",
+      });
+    }
+
+    // =====================================================
+    // REQUEST DEDUPLICATION
+    // =====================================================
 
     requestKey = JSON.stringify({
       date,
       customer,
+      ordertype: normalizedOrderType,
       shippinglocation,
       products,
     });
@@ -64,14 +92,18 @@ export const createSalesOrder = async (req, res) => {
 
     processingRequests.add(requestKey);
 
-    const normalizedDivision = products.map((item) => {
-      return String(item.division).trim().toLowerCase();
-    });
+    // =====================================================
+    // VALIDATE + NORMALIZE DIVISIONS
+    // =====================================================
 
-    const hasInvalidDivision = products.some(
-      (item) =>
-        !ALLOWED_DIVISIONS.includes(String(item.division).trim().toLowerCase()),
+    const normalizedDivision = products.map((item) =>
+      String(item.division).trim().toLowerCase(),
     );
+
+    const hasInvalidDivision = normalizedDivision.some(
+      (division) => !ALLOWED_DIVISIONS.includes(division),
+    );
+
     if (hasInvalidDivision) {
       return res.status(400).json({
         success: false,
@@ -79,44 +111,143 @@ export const createSalesOrder = async (req, res) => {
       });
     }
 
-    const rows = await getSalesOrders();
+    // =====================================================
+    // GENERATE SO NUMBER
+    // =====================================================
+    console.time("⏱️ getSalesOrders");
+    const rows = await getLastSalesOrderNumber();
 
     let soNo = "ANF00001";
 
     if (rows.length > 1) {
       const lastSo = rows[rows.length - 1][0];
 
-      const number = parseInt(lastSo.replace("ANF", ""));
+      const number = parseInt(String(lastSo).replace("ANF", ""), 10) || 0;
 
       soNo = `ANF${String(number + 1).padStart(5, "0")}`;
     }
+    console.timeEnd("⏱️ getSalesOrders");
+
+    // =====================================================
+    // PROCESS PRODUCTS
+    // =====================================================
 
     const values = [];
+    const productionValues = [];
+    const dispatchOrders = [];
 
-    products.forEach((item) => {
-      const productionQty = Math.max(
-        Number(item.qty) - Number(item.openingFgQty),
-        0,
-      );
-      const status =
-        Number(item.openingFgQty) >= Number(item.qty)
-          ? "Ready To Dispatch"
-          : "Pending Production";
+    // =====================================================
+    // FG LOOKUP
+    // INTERNAL = NO FG CHECK
+    // CUSTOMER = FG CHECK
+    // =====================================================
+
+    const processedProducts = await Promise.all(
+      products.map(async (item) => {
+        const soQty = Number(item.qty) || 0;
+        const [productMaster, fgStock] = await Promise.all([
+          getProductMasterCached(item.skucode),
+          getFGCached(item.skucode),
+        ]);
+
+        if (soQty <= 0) {
+          throw new Error(`Invalid quantity for SKU: ${item.skucode}`);
+        }
+
+        // -------------------------------------------------
+        // INTERNAL ORDER
+        // -------------------------------------------------
+
+        if (normalizedOrderType === "INTERNAL") {
+          return {
+            item,
+            soQty,
+            openingFG: 0,
+            dispatchQty: 0,
+            productionQty: soQty,
+            status: "Pending Production",
+          };
+        }
+
+        // -------------------------------------------------
+        // CUSTOMER ORDER
+        // -------------------------------------------------
+        console.log("productsss", productMaster);
+
+        const soMeterQty = convertToMeter({
+          qty: soQty,
+          unit: item.unit,
+          basicUnit: productMaster.basicUnit,
+          meterPerRoll: productMaster.meterPerRoll,
+          meterPerKg: productMaster.meterPerKg,
+        });
+
+        console.log("soMeterQty.......", soMeterQty);
+
+        const openingFG = Number(fgStock?.availableQty) || 0;
+
+        const dispatchQty = Math.min(openingFG, soMeterQty);
+
+        const productionQty = Math.max(soMeterQty - openingFG, 0);
+
+        const status =
+          productionQty === 0 ? "Ready To Dispatch" : "Pending Production";
+
+        console.log(
+          `SKU: ${item.skucode} | SO: ${soQty} | FG: ${openingFG} | Dispatch: ${dispatchQty} | Production: ${productionQty}`,
+        );
+
+        return {
+          item,
+          soQty,
+          openingFG,
+          dispatchQty,
+          productionQty,
+          status,
+          fgStock
+        };
+      }),
+    );
+
+    // =====================================================
+    // BUILD SALES ORDER + DISPATCH + PRODUCTION
+    // =====================================================
+
+    for (const {
+      item,
+      soQty,
+      openingFG,
+      dispatchQty,
+      productionQty,
+      status,
+      fgStock
+    } of processedProducts) {
+      // ===================================================
+      // SALES ORDER ROW
+      // ===================================================
+
       values.push([
         soNo,
         date,
         item.skucode,
         customer,
         item.product,
-        ordertype,
+        normalizedOrderType,
+        route,
+        partyPO,
         item.division,
-        item.qty,
+        soQty,
         item.rate,
         item.rateadjustment,
         item.finalrate,
         item.unit,
-        item.openingFgQty,
+
+        // AVAILABLE FG AT SO CREATION
+        openingFG,
+
+        // PRODUCTION REQUIRED
         productionQty,
+
         jobWork,
         freight,
         0,
@@ -125,51 +256,52 @@ export const createSalesOrder = async (req, res) => {
         status,
         billinglocation,
         shippinglocation,
-        Number(item.finalrate) * Number(item.qty),
+
+        Number(item.finalrate) * soQty,
       ]);
-    });
 
-    // values for production state
-    const productionValues = [];
-    await appendMultipleSalesOrders(values);
+      // ===================================================
+      // CUSTOMER → FG AVAILABLE → DISPATCH
+      // ===================================================
 
-    for (let item of products) {
-      const soQty = Number(item.qty);
-      const openingFG = Number(item.openingFgQty);
-      const productionQty = Math.max(soQty - openingFG, 0);
-      //  Enough FG available
-      if (openingFG >= soQty) {
-        await addDirectDispatchOrder({
+      if (normalizedOrderType === "CUSTOMER" && dispatchQty > 0) {
+        console.log("HIII i am in dispatch portion");
+        dispatchOrders.push({
           soNo,
           sku: item.skucode,
+          cycleID: "",
           product: item.product,
-          rate: item.finalrate,
-          division: item.division,
-          qty: soQty,
-          route,
           customer,
+          driverName: "",
+          vehicleNo: "",
           partyPO,
-          shippinglocation: shippinglocation,
-          billinglocation: billinglocation,
-          updatedBy: orderReceivedBy,
-        });
-        // we are sending notification to dispatch manager when sales order is created and enough FG is available for dispatch
-        await sendNotification({
-          role: "dispatch",
+          route,
           division: item.division,
-          type: "sales-order",
-          title: "New Sales Order Ready for Dispatch",
-          message: `A new sales order:${soNo} is ready for dispatch`,
-          reference: soNo,
+          productionQty: 0,
+          rate: item.finalrate,
+          shippinglocation,
+          billinglocation,
+          freight,
+          qty: dispatchQty,
+          status: "Ready To Dispatch",
+          billing: "",
+          fgStock
         });
-      } else {
-        const cycleID = generateNextCycleId(soNo,item.skucode);
+      }
+
+      // ===================================================
+      // PRODUCTION REQUIRED
+      // ===================================================
+
+      if (productionQty > 0) {
+        const cycleID = generateNextCycleId(soNo, item.skucode);
+        console.log("HIII i am in production portion");
         productionValues.push([
           soNo,
           cycleID,
           item.skucode,
           item.product,
-          ordertype,
+          normalizedOrderType,
           productionQty,
           item.division,
           "",
@@ -177,40 +309,105 @@ export const createSalesOrder = async (req, res) => {
         ]);
       }
     }
+
+    // =====================================================
+    // WRITE SALES ORDERS
+    // =====================================================
+
+    await appendMultipleSalesOrders(values);
+
+    // =====================================================
+    // WRITE DIRECT DISPATCH ORDERS
+    // =====================================================
+
+    if (dispatchOrders.length > 0) {
+      await Promise.all(
+        dispatchOrders.map((order) =>[
+           consumeFGStockService({
+            sku:order.sku,
+            qty:order.qty,
+            updatedBy:orderReceivedBy,
+            fgStock:order.fgStock
+          }),
+          addDirectDispatchOrder(order)]),
+      );
+
+      // ---------------------------------------------------
+      // DISPATCH NOTIFICATIONS
+      // ---------------------------------------------------
+
+      const dispatchDivisions = [
+        ...new Set(
+          dispatchOrders.map((order) =>
+            String(order.division).trim().toLowerCase(),
+          ),
+        ),
+      ];
+
+      await Promise.all(
+        dispatchDivisions.map((division) =>
+          sendNotification({
+            role: "dispatch",
+            division,
+            type: "sales-order",
+            title: "New Sales Order Ready for Dispatch",
+            message: `A new sales order ${soNo} is ready for dispatch`,
+            reference: soNo,
+          }),
+        ),
+      );
+    }
+
+    // =====================================================
+    // WRITE PRODUCTION ORDERS
+    // =====================================================
+
     if (productionValues.length > 0) {
       await appendSalesOrderToProductionProcess(
         productionValues,
         normalizedDivision,
       );
-      const divisions = [...new Set(normalizedDivision)];
-      for (const division of divisions) {
-        await sendNotification({
-          role: "productionSupervisor",
-          division: division,
-          type: "sales-order",
-          title: "New Sales Order Created",
-          message: `A new sales order has been created for ${soNo}`,
-          reference: soNo,
-        });
-      }
+
+      // ---------------------------------------------------
+      // PRODUCTION NOTIFICATIONS
+      // ---------------------------------------------------
+
+      const productionDivisions = [...new Set(normalizedDivision)];
+
+      await Promise.all(
+        productionDivisions.map((division) =>
+          sendNotification({
+            role: "productionSupervisor",
+            division,
+            type: "sales-order",
+            title: "New Sales Order Created",
+            message: `A new sales order has been created for ${soNo}`,
+            reference: soNo,
+          }),
+        ),
+      );
     }
 
+    // =====================================================
+    // SUCCESS
+    // =====================================================
+    console.timeEnd("🔥 TOTAL createSalesOrder");
     return res.status(201).json({
       success: true,
-
       message: "Sales Order Created",
-
       soNo,
     });
   } catch (error) {
-    console.log("error in req:", error);
+    console.log("Error in createSalesOrder:", error);
+
     return res.status(500).json({
       success: false,
-
       message: error.message,
     });
   } finally {
-    processingRequests.delete(requestKey);
+    if (requestKey) {
+      processingRequests.delete(requestKey);
+    }
   }
 };
 
