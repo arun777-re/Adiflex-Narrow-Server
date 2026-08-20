@@ -1,5 +1,6 @@
 import { getIO } from "../socket/socket.js";
 import { appendNotification } from "../services/notificationSheet.js";
+import { sendWebPushNotification } from "../services/pushNotificationService.js";
 
 export const sendNotification = async ({
   role,
@@ -40,4 +41,12 @@ export const sendNotification = async ({
   }
   console.log("Sending notification to room:", room);
   console.log("Notification emitted");
+
+  await sendWebPushNotification(notification);
+  console.log("📡 Notification completed:", {
+    role,
+    division,
+    type,
+  });
+
 };

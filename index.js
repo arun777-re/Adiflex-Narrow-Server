@@ -13,6 +13,7 @@ import productRoutes from './routes/productRoutes.js';
 import fgRoutes from './routes/fgRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js'
 
 
 
@@ -47,6 +48,7 @@ app.use('/products',productRoutes);
 app.use('/dashboard',dashboardRoutes);
 app.use('/fg',fgRoutes);
 app.use('/billing',billingRoutes);
+app.use('/notifications',notificationRoutes);
 
 
 // Start server

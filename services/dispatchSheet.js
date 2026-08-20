@@ -1,6 +1,7 @@
 import sheets, { updateCell } from "../config/db.js";
 import { DISPATCH_COLUMNS, DISPATCH_SHEET_COLUMNS } from "../constants/dispatch.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
+import { sendNotification } from "../helpers/notificationHelper.js";
 import { appendBillingOrder } from "./billingService.js";
 import { getSalesOrders, updateDispatchedQty, updateOverallStatus, updateSalesOrderAfterDispatch } from "./salesOrderSheet.js";
 
@@ -312,6 +313,17 @@ appendBillingOrder({
   dispatchQty: qty,
 }).catch((error) => {
   console.error("❌ Billing append failed:", error);
+});
+
+sendNotification({
+  role: "billing",
+  division: dispatchRow[DISPATCH_COLUMNS.DIVISION],
+  type: "billing-order",
+  title: "New Order Ready for Billing",
+  message: `Dispatch ${soNo} - ${product} is ready for billing`,
+  reference: soNo,
+}).catch((error) => {
+  console.error("❌ Billing notification failed:", error);
 });
   console.timeEnd("Dispatch Starts");
 
