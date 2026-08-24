@@ -1,6 +1,7 @@
 import {
   addDirectDispatchOrder,
   convertToMeter,
+  generateNextSoNo,
   getFGCached,
   getProductMasterCached,
 } from "../helpers/salesOrderHelpers.js";
@@ -115,17 +116,9 @@ export const createSalesOrder = async (req, res) => {
     // GENERATE SO NUMBER
     // =====================================================
     console.time("⏱️ getSalesOrders");
-    const rows = await getLastSalesOrderNumber();
+    const soNo = await generateNextSoNo();
 
-    let soNo = "ANF00001";
-
-    if (rows.length > 1) {
-      const lastSo = rows[rows.length - 1][0];
-
-      const number = parseInt(String(lastSo).replace("ANF", ""), 10) || 0;
-
-      soNo = `ANF${String(number + 1).padStart(5, "0")}`;
-    }
+console.log("🔥 GENERATED SO:", soNo);
     console.timeEnd("⏱️ getSalesOrders");
 
     // =====================================================

@@ -166,3 +166,24 @@ export const convertToMeter = ({
 
   throw new Error(`Unsupported unit: ${unit}`);
 };
+
+
+export const generateNextSoNo = async () => {
+  const rows = await getLastSalesOrderNumber();
+
+  let maxNumber = 0;
+
+  for (const row of rows) {
+    const so = String(row[0] || "").trim();
+
+    if (!so.startsWith("ANF")) continue;
+
+    const number = parseInt(so.slice(3), 10);
+
+    if (!Number.isNaN(number) && number > maxNumber) {
+      maxNumber = number;
+    }
+  }
+
+  return `ANF${String(maxNumber + 1).padStart(5, "0")}`;
+};
