@@ -60,3 +60,35 @@ export const updateCell = async ({
   });
 
 };
+
+
+export const appendCell = async ({
+  division,
+  spreadsheetId,
+  sheetName,
+  range,
+  value,
+}) => {
+  try {
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetName}!${range}`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [value],
+      },
+    });
+
+    console.log("✅ Row appended:", {
+      sheetName,
+      range,
+    });
+
+  } catch (error) {
+    console.error("❌ appendCell Error:", error);
+
+    throw error;
+  }
+};

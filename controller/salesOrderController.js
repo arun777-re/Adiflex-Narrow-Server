@@ -155,7 +155,7 @@ export const createSalesOrder = async (req, res) => {
         }
 
         // -------------------------------------------------
-        // INTERNAL ORDER
+        // INTERNAL ORDER(here unit must be always in meter)
         // -------------------------------------------------
 
         if (normalizedOrderType === "INTERNAL") {
@@ -200,6 +200,7 @@ export const createSalesOrder = async (req, res) => {
         return {
           item,
           soQty,
+          soMeterQty,
           openingFG,
           dispatchQty,
           productionQty,
@@ -220,7 +221,8 @@ export const createSalesOrder = async (req, res) => {
       dispatchQty,
       productionQty,
       status,
-      fgStock
+      fgStock,
+      soMeterQty
     } of processedProducts) {
       // ===================================================
       // SALES ORDER ROW
@@ -237,6 +239,7 @@ export const createSalesOrder = async (req, res) => {
         partyPO,
         item.division,
         soQty,
+        soMeterQty,
         item.rate,
         item.rateadjustment,
         item.finalrate,
@@ -257,7 +260,7 @@ export const createSalesOrder = async (req, res) => {
         billinglocation,
         shippinglocation,
 
-        Number(item.finalrate) * soQty,
+        Number(item.finalrate) * soMeterQty,
       ]);
 
       // ===================================================

@@ -93,7 +93,9 @@ export const handleFinishedGoods = async ({
     jobWork,
     skucode,
   });
+  console.log("order type",orderType)
   const now = new Date().toLocaleString();
+  const normalizedOrderType = String(orderType || "").trim().toLowerCase();
   // dispatch data 
   const dispatchRow = [
     soNo,
@@ -119,7 +121,7 @@ export const handleFinishedGoods = async ({
     now,
     now,
   ];
-  if (orderType === "Customer") {
+  if (normalizedOrderType === "customer") {
     await appendDispatch({
       values: dispatchRow,
     });

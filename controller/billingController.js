@@ -50,12 +50,7 @@ export const changeBillingStatus = async (req, res) => {
       });
     }
 
-    if (!cycleID) {
-      return res.status(400).json({
-        success: false,
-        message: "Cycle ID is required",
-      });
-    }
+ 
 
     if (!status) {
       return res.status(400).json({

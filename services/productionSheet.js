@@ -407,17 +407,20 @@ export const completeProductionProcess = async ({
       updatedBy: updatedBy,
     });
     if (remainingQty > 0) {
-      await updateCell({
+      await Promise.all([
+      updateCell({
         division,
         range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
         value: "Cycle Completed",
-      });
-      await createNextProductionCycle({
+      }),
+      createNextProductionCycle({
         division,
         skucode,
         currentRow: row,
         remainingQty,
-      });
+      })
+      ])
+    
     } else {
       // Close Order
       await updateCell({
@@ -425,13 +428,15 @@ export const completeProductionProcess = async ({
         range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
         value: "Completed",
       });
-      await sendNotification({
+      sendNotification({
         role: "dispatch",
         division: division,
         type: "dispatch-ready",
         title: "New Sales Order Ready for Dispatch",
         message: `A new sales order:${soNo} is ready for dispatch`,
         reference: soNo,
+      }).then(()=>{console.log("Notification sent to dispatch team")}).catch(()=>{
+        console.error("Error in sending notification to dispatch team ")
       });
     }
   }

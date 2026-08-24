@@ -8,6 +8,7 @@ import { getSalesOrders, updateDispatchedQty, updateOverallStatus, updateSalesOr
 // function to append data to dispatch sheet
 
 export const appendDispatch = async ({ values }) => {
+  console.log("dispatch function")
   if (!values) {
     throw new Error("Value is required field");
   }

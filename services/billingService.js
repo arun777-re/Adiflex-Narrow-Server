@@ -2,7 +2,7 @@
 // APPEND BILLING ORDER
 // ==========================================
 
-import sheets from "../config/db.js";
+import sheets, { updateCell } from "../config/db.js";
 import { BILLING_COLUMNS } from "../constants/billingColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
@@ -87,13 +87,37 @@ export const updateBillingStatus = async ({
 
   const rows = response.data.values || [];
 
-  const rowIndex = rows.findIndex(
-    (row, index) =>
-      index > 0 &&
-      String(row[BILLING_COLUMNS.SO_NO]).trim() === String(soNo).trim() &&
-      String(row[BILLING_COLUMNS.SKU_CODE]).trim() === String(skuCode).trim() &&
-      String(row[BILLING_COLUMNS.CYCLE_ID]).trim() === String(cycleID).trim()
-  );
+  const normalizedSO = String(soNo || "").trim();
+  const normalizedSKU = String(skuCode || "").trim();
+  const normalizedCycle = String(cycleID || "").trim();
+
+  const rowIndex = rows.findIndex((row, index) => {
+    if (index === 0) return false;
+
+    const rowSO =
+      String(row[BILLING_COLUMNS.SO_NO] || "").trim();
+
+    const rowSKU =
+      String(row[BILLING_COLUMNS.SKU_CODE] || "").trim();
+
+    const rowCycle =
+      String(row[BILLING_COLUMNS.CYCLE_ID] || "").trim();
+
+    // SO + SKU mandatory
+    if (
+      rowSO !== normalizedSO ||
+      rowSKU !== normalizedSKU
+    ) {
+      return false;
+    }
+
+    // Cycle ID optional
+    if (normalizedCycle) {
+      return rowCycle === normalizedCycle;
+    }
+
+    return true;
+  });
 
   if (rowIndex === -1) {
     throw new Error("Billing order not found");
@@ -102,7 +126,7 @@ export const updateBillingStatus = async ({
   const rowNumber = rowIndex + 1;
 
   await updateCell({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    spreadsheetId: process.env.BILLING_SHEET_ID,
     sheetName: SHEET_NAMES.BILLING_SHEET,
     range: `J${rowNumber}`,
     value: status,
