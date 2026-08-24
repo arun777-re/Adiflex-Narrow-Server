@@ -4,7 +4,7 @@ import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { appendDispatch } from "../services/dispatchSheet.js";
 import { findFGStockBySKU } from "../services/fgSheets.js";
 import { getProductBySkuService } from "../services/productSheet.js";
-import { getSalesOrders } from "../services/salesOrderSheet.js";
+import { getLastSalesOrderNumber, getSalesOrders } from "../services/salesOrderSheet.js";
 
 // ==========================================
 // REQUEST LEVEL CACHE
