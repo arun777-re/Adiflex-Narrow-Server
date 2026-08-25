@@ -80,6 +80,8 @@ export const createProductService = async ({
   color,
   rate,
   size,
+  meterPerRoll,
+  meterPerKG,
   createdBy,
 }) => {
   const authClient = await auth.getClient();
@@ -117,11 +119,13 @@ export const createProductService = async ({
     [
       sku,
       productName,
-      rate,
       division,
-      unit,
-      color,
       size,
+      color,
+      rate,
+      unit,
+      meterPerRoll,
+      meterPerKG,
       "Active",
       createdBy,
       new Date().toISOString(),

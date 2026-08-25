@@ -9,6 +9,8 @@ import {
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
   try {
+
+    console.log("req.body.....",req.body)
     const product = await createProductService(req.body);
 
     res.status(201).json({
