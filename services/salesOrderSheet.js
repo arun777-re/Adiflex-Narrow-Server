@@ -36,7 +36,7 @@ export const appendMultipleSalesOrders = async (values) => {
 
     spreadsheetId: salesOrderSpreadsheetId,
 
-    range: `${SHEET_NAMES.SALES_MASTER}!A:W`,
+    range: `${SHEET_NAMES.SALES_MASTER}!A:Z`,
 
     valueInputOption: "USER_ENTERED",
 

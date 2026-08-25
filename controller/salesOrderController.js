@@ -232,11 +232,11 @@ console.log("🔥 GENERATED SO:", soNo);
         partyPO,
         item.division,
         soQty,
+        item.unit,
         soMeterQty,
         item.rate,
         item.rateadjustment,
         item.finalrate,
-        item.unit,
 
         // AVAILABLE FG AT SO CREATION
         openingFG,
