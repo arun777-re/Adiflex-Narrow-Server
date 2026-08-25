@@ -167,9 +167,10 @@ export const convertToMeter = ({
   throw new Error(`Unsupported unit: ${unit}`);
 };
 
-
 export const generateNextSoNo = async () => {
-  const rows = await getLastSalesOrderNumber();
+  const rows = await getSalesOrders();
+
+  console.log("🔥 TOTAL SALES ORDER ROWS:", rows.length);
 
   let maxNumber = 0;
 
@@ -180,10 +181,17 @@ export const generateNextSoNo = async () => {
 
     const number = parseInt(so.slice(3), 10);
 
+    console.log("🔥 FOUND SO:", so, "NUMBER:", number);
+
     if (!Number.isNaN(number) && number > maxNumber) {
       maxNumber = number;
     }
   }
 
-  return `ANF${String(maxNumber + 1).padStart(5, "0")}`;
+  const nextSo = `ANF${String(maxNumber + 1).padStart(5, "0")}`;
+
+  console.log("🔥 MAX SO NUMBER:", maxNumber);
+  console.log("🔥 GENERATED SO:", nextSo);
+
+  return nextSo;
 };
