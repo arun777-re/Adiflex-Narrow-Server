@@ -18,6 +18,7 @@ import { sendNotification } from "../helpers/notificationHelper.js";
 import { generateNextCycleId } from "../helpers/productionHelpers.js";
 import { consumeFGStockService, findFGStockBySKU } from "../services/fgSheets.js";
 import { getProductBySkuService } from "../services/productSheet.js";
+import { SALES_COLUMNS } from "../constants/salesColumns.js";
 
 const processingRequests = new Set();
 
@@ -415,34 +416,35 @@ export const getAllSalesOrders = async (req, res) => {
     // Header remove
     const data = rows.slice(1);
     const orders = data.map((row) => ({
-      soNo: row[0] || "",
-      date: row[1] || "",
-      skucode: row[2] || "",
-      customer: row[3] || "",
-      product: row[4] || "",
-      ordertype: row[5] || "",
+      soNo: row[SALES_COLUMNS.SO_NO] || "",
+      date: row[SALES_COLUMNS.DATE] || "",
+      skucode: row[SALES_COLUMNS.SKU_CODE] || "",
+      customer: row[SALES_COLUMNS.CUSTOMER] || "",
+      product: row[SALES_COLUMNS.PRODUCT] || "",
+      ordertype: row[SALES_COLUMNS.ORDER_TYPE] || "",
 
-      division: row[6] || "",
+      division: row[SALES_COLUMNS.DIVISION] || "",
 
-      qty: Number(row[7]) || 0,
+      qty: Number(row[SALES_COLUMNS.SO_QTY]) || 0,
+      qtyInMeter:Number(row[SALES_COLUMNS.SO_QTY_IN_METER] ) || 0,
+      rate: Number(row[SALES_COLUMNS.STANDARD_RATE]) || 0,
+      rateadjustment: Number(row[SALES_COLUMNS.RATE_ADJUSTMENT]) || 0,
+      finalrate: Number(row[SALES_COLUMNS.FINAL_RATE]) || 0,
+      unit: row[SALES_COLUMNS.UNIT] || "",
 
-      rate: Number(row[8]) || 0,
-      rateadjustment: Number(row[9]) || 0,
-      finalrate: Number(row[10]) || 0,
-      unit: row[11] || "",
+      openingFgQty: Number(row[SALES_COLUMNS.OPENING_FG_QTY]) || 0,
 
-      openingFgQty: Number(row[12]) || 0,
+      productionQty: Number(row[SALES_COLUMNS.PRODUCTION_QTY]) || 0,
 
-      productionQty: Number(row[13]) || 0,
+      jobWork: row[SALES_COLUMNS.JOB_WORK] === true || row[14] === "TRUE",
+      manufacturedQty: Number(row[SALES_COLUMNS.MANUFACTURED_QTY]) || 0,
 
-      jobWork: row[14] === true || row[14] === "TRUE",
-      manufacturedQty: Number(row[15]) || 0,
+      dispatchedQty: Number(row[SALES_COLUMNS.DISPATCHED_QTY]) || 0,
 
-      dispatchedQty: Number(row[16]) || 0,
+      orderReceivedBy: row[SALES_COLUMNS.ORDER_RECEIVED_BY] || "",
 
-      orderReceivedBy: row[17] || "",
-
-      status: row[18] || "",
+      status: row[SALES_COLUMNS.OVERALL_STATUS] || "",
+      orderAmount:row[SALES_COLUMNS.ORDER_AMOUNT] || 0,
     }));
 
     return res.status(200).json({

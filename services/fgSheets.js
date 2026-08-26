@@ -362,3 +362,76 @@ export const addFGStockService = async ({
     throw error;
   }
 };
+
+// =====================================================
+// ADD NEW PRODUCT TO FG
+// =====================================================
+
+export const addNewProductToFG = async ({
+  skuCode,
+  product,
+  division,
+}) => {
+  try {
+    if (!skuCode) {
+      throw new Error("SKU Code is required");
+    }
+
+    if (!product) {
+      throw new Error("Product is required");
+    }
+
+    const authClient = await auth.getClient();
+
+    const sheets = google.sheets({
+      version: "v4",
+      auth: authClient,
+    });
+
+    const now = new Date().toISOString();
+
+    const newFGRow = [
+      skuCode,       // A - SKU CODE
+      product,       // B - PRODUCT
+      division,      // C - DIVISION
+      0,             // D - AVAILABLE QTY
+      0,             // E - DISPATCH QTY
+      0,             // F - OPENING QTY
+      now,           // G - CREATED AT
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+
+      range: `${SHEET_NAMES.FG_SHEET}!A:G`,
+
+      valueInputOption: "USER_ENTERED",
+
+      insertDataOption: "INSERT_ROWS",
+
+      requestBody: {
+        values: [newFGRow],
+      },
+    });
+
+    console.log("✅ NEW PRODUCT ADDED TO FG:", {
+      skuCode,
+      product,
+      division,
+    });
+
+    return {
+      success: true,
+      skuCode,
+    };
+
+  } catch (error) {
+
+    console.error(
+      "❌ ADD PRODUCT TO FG ERROR:",
+      error
+    );
+
+    throw error;
+  }
+};
