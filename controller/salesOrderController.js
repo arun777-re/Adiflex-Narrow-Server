@@ -415,7 +415,8 @@ export const getAllSalesOrders = async (req, res) => {
 
     // Header remove
     const data = rows.slice(1);
-    const orders = data.map((row) => ({
+    const validRows = data.filter((row)=> String(row[SALES_COLUMNS.SO_NO] || "").trim() !== "");
+    const orders = validRows.map((row) => ({
       soNo: row[SALES_COLUMNS.SO_NO] || "",
       date: row[SALES_COLUMNS.DATE] || "",
       skucode: row[SALES_COLUMNS.SKU_CODE] || "",
