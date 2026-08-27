@@ -410,6 +410,9 @@ console.log("🔥 GENERATED SO:", soNo);
 
 // get all sales orders
 export const getAllSalesOrders = async (req, res) => {
+  const toBoolean = (value) => {
+  return String(value).trim().toUpperCase() === "TRUE";
+};
   try {
     const rows = await getSalesOrders();
 
@@ -437,13 +440,13 @@ export const getAllSalesOrders = async (req, res) => {
 
       productionQty: Number(row[SALES_COLUMNS.PRODUCTION_QTY]) || 0,
 
-      jobWork: row[SALES_COLUMNS.JOB_WORK] === true || row[14] === "TRUE",
+      jobWork: toBoolean(row[SALES_COLUMNS.JOB_WORK]) ,
       manufacturedQty: Number(row[SALES_COLUMNS.MANUFACTURED_QTY]) || 0,
 
       dispatchedQty: Number(row[SALES_COLUMNS.DISPATCHED_QTY]) || 0,
 
       orderReceivedBy: row[SALES_COLUMNS.ORDER_RECEIVED_BY] || "",
-
+       
       status: row[SALES_COLUMNS.OVERALL_STATUS] || "",
       orderAmount:row[SALES_COLUMNS.ORDER_AMOUNT] || 0,
     }));
