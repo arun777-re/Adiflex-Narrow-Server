@@ -13,7 +13,7 @@ export const getProductsService = async () => {
   const response = await sheets.spreadsheets.values.get({
     auth: authClient,
     spreadsheetId,
-    range: `${SHEET_NAMES.PRODUCT_SHEET}!A:M`,
+    range: `${SHEET_NAMES.PRODUCT_SHEET}!A:N`,
   });
 
   const rows = response.data.values || [];
@@ -34,8 +34,6 @@ export const getProductsService = async () => {
     meterPerKG:row[PRODUCT_COLUMNS.METERPERKG],
     size: row[PRODUCT_COLUMNS.SIZE] || "",
     status: row[PRODUCT_COLUMNS.STATUS] || "",
-    createdBy: row[PRODUCT_COLUMNS.CREATED_BY] || "",
-    createdAt: row[PRODUCT_COLUMNS.CREATED_AT] || "",
     updatedBy: row[PRODUCT_COLUMNS.UPDATED_BY] || "",
     updatedAt: row[PRODUCT_COLUMNS.UPDATED_AT] || "",
   }));
