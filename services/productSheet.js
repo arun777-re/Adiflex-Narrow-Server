@@ -181,9 +181,11 @@ export const updateProductService = async ({
   productName,
   rate,
   division,
-  unit,
   color,
   size,
+  meterPerKg,
+  meterPerRoll,
+  basicUnit="METER",
   updatedBy,
 }) => {
   const authClient = await auth.getClient();
@@ -198,26 +200,28 @@ const rowIndex = rows.findIndex(
   }
 
   // Skip Header Row
-  const actualRow = rowIndex + 1;
-
+  const actualRow = rowIndex + 2;
+console.log("actual row of data",actualRow)
   await sheets.spreadsheets.values.update({
     auth: authClient,
     spreadsheetId,
-    range: `${SHEET_NAMES.PRODUCT_SHEET}!B${actualRow}:L${actualRow}`,
+    range: `${SHEET_NAMES.PRODUCT_SHEET}!B${actualRow}:N${actualRow}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[
-        productName,
-        rate,
-        division,
-        unit,
-        color,
-        size,
-        rows[rowIndex].status, // Existing Status
-        rows[rowIndex].createdBy, // Existing Created By
-        rows[rowIndex].createdAt, // Existing Created At
-        updatedBy,
-        new Date().toISOString(),
+   values: [[
+        productName,                    // B Product
+        division,                       // C Division
+        size,                           // D Size
+        color,                          // E Color
+        rate,                           // F Rate
+        basicUnit,                      // G BasicUnit
+        meterPerRoll,                   // H METER/ROLL
+        meterPerKg,                     // I METER/KG
+        rows[rowIndex].status,          // J STATUS
+        rows[rowIndex].createdBy,       // K Created By
+        rows[rowIndex].createdAt,       // L Created At
+        updatedBy,                      // M Updated By
+        new Date().toISOString(),       // N Updated At
       ]],
     },
   });

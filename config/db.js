@@ -2,8 +2,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { google } from "googleapis";
 
-import fs from "fs";
-import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 export const DATABASES = {
   SALES_ORDER:process.env.GOOGLE_SHEET_ID,
