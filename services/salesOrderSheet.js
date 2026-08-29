@@ -21,7 +21,7 @@ export const getSalesOrders = async () => {
 
     spreadsheetId: salesOrderSpreadsheetId,
 
-    range: `${SHEET_NAMES.SALES_MASTER}!A:W`,
+    range: `${SHEET_NAMES.SALES_MASTER}!A:Z`,
   });
 
   return response.data.values || [];
@@ -68,7 +68,7 @@ export const appendSalesOrderToProductionProcess = async (values, division) => {
 
     spreadsheetId: spreadsheetId,
 
-    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:I`,
+    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:J`,
 
     valueInputOption: "USER_ENTERED",
 

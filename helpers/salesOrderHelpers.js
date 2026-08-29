@@ -104,7 +104,7 @@ export const getFGCached = async (sku) => {
 
 // get information from the sales Order sheet 
 export const getRateFromSalesOrder = async ({ soNo, product }) => {
-  const rows = await getSalesOrders(); // SalesOrderItems ya SalesOrder sheet
+  const rows = await getSalesOrders(); // SalesOrder Items ya SalesOrder sheet
   const row = rows.find(
     (item) =>
       String(item[SALES_COLUMNS.SO_NO]).trim() === String(soNo).trim() &&
@@ -117,7 +117,11 @@ export const getRateFromSalesOrder = async ({ soNo, product }) => {
     );
   }
   // Rate column index
-  console.log("row", row[SALES_COLUMNS.FINAL_RATE]);
+  console.log("row", row[SALES_COLUMNS.FINAL_RATE],'billing location',row[SALES_COLUMNS.BILLING_LOCATION],
+    'SHIPPING LOCATION', row[SALES_COLUMNS.SHIPPING_LOCATION]
+  );
+
+  console.log("sales row....:",row)
 
 return {
   rate: Number(row[SALES_COLUMNS.FINAL_RATE] || 0),

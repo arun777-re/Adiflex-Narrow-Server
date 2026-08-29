@@ -298,6 +298,7 @@ console.log("🔥 GENERATED SO:", soNo);
           cycleID,
           item.skucode,
           item.product,
+          customer,
           normalizedOrderType,
           productionQty,
           item.division,

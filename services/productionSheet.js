@@ -269,180 +269,470 @@ export const startProductionProcess = async ({
 // COMPLETE PRODUCTION PROCESS
 // =====================================================
 
+
 export const completeProductionProcess = async ({
   soNo,
   cycleID,
-
   product,
-
   process,
-
   productionQty,
-
   updatedBy,
-
   division,
 }) => {
-  const rows = await getProductionOrders(division);
+  const TOTAL_TIMER = `🔥 TOTAL completeProductionProcess | ${soNo} | ${cycleID} | ${process}`;
 
-  const { rowNumber, row } = findProductionOrder(rows, soNo, product,cycleID);
+  console.time(TOTAL_TIMER);
 
-  const processMap = PROCESS_MAP[process];
+  try {
+    // =========================================================
+    // 1. GET PRODUCTION ORDER
+    // =========================================================
 
-  if (!processMap) {
-    throw new Error(`Invalid process: ${process}`);
-  }
+    console.time("⏱️ 1. getProductionOrders");
 
-  // PREVIOUS PROCESS
-  validatePreviousProcess(row, process);
+    const rows = await getProductionOrders(division);
 
-  // CURRENT STATUS
-  const currentStatus = getProcessStatus(row, process);
+    console.timeEnd("⏱️ 1. getProductionOrders");
 
-  if (currentStatus === "Pending") {
-    throw new Error("Process must be started first");
-  }
 
-  if (currentStatus === "Completed") {
-    throw new Error(`${process} is already completed`);
-  }
+    // =========================================================
+    // 2. FIND PRODUCTION ORDER
+    // =========================================================
 
-  // FIRST PROCESS
-  const firstProcess = getFirstProcess(row);
+    console.time("⏱️ 2. findProductionOrder");
 
-  // PRODUCTION QTY
-  if (process === firstProcess) {
-    const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY])
- 
-    if (
-      productionQty === undefined ||
-      productionQty === null ||
-      productionQty === ""
-    ) {
-      throw new Error("Production Qty is required");
-    }
-
-    const qty = Number(productionQty);
-
-    if (Number.isNaN(qty) || qty <= 0) {
-      throw new Error("Production Qty must be greater than 0");
-    }
-       if (targetQty < qty) {
-      throw new Error("Production Qty cannot exceed Target Qty");
-    }
-
-    await updateCell({
-      division,
-
-      range: `${PRODUCTION_SHEET_COLUMNS.PRODUCTION_QTY}${rowNumber}`,
-
-      value: qty,
-    });
-  }
-
-  const now = new Date().toLocaleString();
-
-  // END TIME
-  await updateCell({
-    division,
-
-    range: `${processMap.endTime}${rowNumber}`,
-
-    value: now,
-  });
-
-  // STATUS
-  if (processMap.status) {
-    await updateCell({
-      division,
-      range: `${processMap.status}${rowNumber}`,
-      value: "Completed",
-    });
-  }
-
-  // UPDATED BY
-  await updateCell({
-    division,
-    range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_BY}${rowNumber}`,
-    value: updatedBy || "",
-  });
-
-  // UPDATED TIME
-  await updateCell({
-    division,
-
-    range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_TIME}${rowNumber}`,
-
-    value: now,
-  });
-
-  // PACKING COMPLETED
-  if (process === "packing") {
-    const skucode = row[PRODUCTION_COLUMNS.SKU_CODE]
-    const finalProductionQty = Number(
-      process === firstProcess
-        ? productionQty
-        : row[PRODUCTION_COLUMNS.PRODUCTION_QTY] || 0,
+    const { rowNumber, row } = findProductionOrder(
+      rows,
+      soNo,
+      product,
+      cycleID
     );
 
-    const wastageQty = Number(row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0);
+    console.timeEnd("⏱️ 2. findProductionOrder");
 
-    const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY]);
-
-    if (finalProductionQty > targetQty ) {
-      throw new Error(
-        "Production Qty cannot exceed Target Qty.",
-      );
+    if (!row || !rowNumber) {
+      throw new Error("Production order not found");
     }
 
-    const remainingQty = targetQty - finalProductionQty;
 
-    await handleFinishedGoods({
-      soNo: soNo,
-      cycleID: cycleID,
-      product: product,
-      division: division,
-      manufacturedQty:finalProductionQty,
-      wastageQty: wastageQty,
-      updatedBy: updatedBy,
+    // =========================================================
+    // 3. PROCESS CONFIG
+    // =========================================================
+
+    console.time("⏱️ 3. processConfig");
+
+    const processMap = PROCESS_MAP[process];
+
+    if (!processMap) {
+      throw new Error(`Invalid process: ${process}`);
+    }
+
+    console.timeEnd("⏱️ 3. processConfig");
+
+
+    // =========================================================
+    // 4. VALIDATE PREVIOUS PROCESS
+    // =========================================================
+
+    console.time("⏱️ 4. validatePreviousProcess");
+
+    validatePreviousProcess(row, process);
+
+    console.timeEnd("⏱️ 4. validatePreviousProcess");
+
+
+    // =========================================================
+    // 5. CURRENT PROCESS STATUS
+    // =========================================================
+
+    console.time("⏱️ 5. getProcessStatus");
+
+    const currentStatus = getProcessStatus(row, process);
+
+    console.timeEnd("⏱️ 5. getProcessStatus");
+
+    if (currentStatus === "Pending") {
+      throw new Error("Process must be started first");
+    }
+
+    if (currentStatus === "Completed") {
+      throw new Error(`${process} is already completed`);
+    }
+
+
+    // =========================================================
+    // 6. FIRST PROCESS
+    // =========================================================
+
+    const firstProcess = getFirstProcess(row);
+
+    const now = new Date().toLocaleString();
+
+    console.log("🔥 Process:", process);
+    console.log("🔥 First Process:", firstProcess);
+    console.log("🔥 Row Number:", rowNumber);
+
+
+    // =========================================================
+    // 7. FIRST PROCESS COMPLETION
+    // =========================================================
+
+    if (process === firstProcess) {
+
+      console.log("🚀 FIRST PROCESS COMPLETION FLOW");
+
+      const targetQty = Number(
+        row[PRODUCTION_COLUMNS.TARGET_QTY]
+      );
+
+
+      // =======================================================
+      // VALIDATE PRODUCTION QTY
+      // =======================================================
+
+      console.time("⏱️ 7. validateProductionQty");
+
+      if (
+        productionQty === undefined ||
+        productionQty === null ||
+        productionQty === ""
+      ) {
+        throw new Error("Production Qty is required");
+      }
+
+      const qty = Number(productionQty);
+
+      if (Number.isNaN(qty) || qty <= 0) {
+        throw new Error(
+          "Production Qty must be greater than 0"
+        );
+      }
+
+      if (qty > targetQty) {
+        throw new Error(
+          "Production Qty cannot exceed Target Qty"
+        );
+      }
+
+      const remainingQty = targetQty - qty;
+
+      console.timeEnd("⏱️ 7. validateProductionQty");
+
+
+      // =======================================================
+      // UPDATE PRODUCTION QTY
+      // =======================================================
+
+      console.time("⏱️ 8. updateProductionQty");
+
+      await updateCell({
+        division,
+        range: `${PRODUCTION_SHEET_COLUMNS.PRODUCTION_QTY}${rowNumber}`,
+        value: qty,
+      });
+
+      console.timeEnd("⏱️ 8. updateProductionQty");
+
+
+      // =======================================================
+      // COMPLETE CURRENT PROCESS
+      // =======================================================
+
+      console.time("⏱️ 9. completeCurrentProcess");
+
+      await updateCell({
+        division,
+        range: `${processMap.endTime}${rowNumber}`,
+        value: now,
+      });
+
+      if (processMap.status) {
+        await updateCell({
+          division,
+          range: `${processMap.status}${rowNumber}`,
+          value: "Completed",
+        });
+      }
+
+      console.timeEnd("⏱️ 9. completeCurrentProcess");
+
+
+      // =======================================================
+      // UPDATED BY
+      // =======================================================
+
+      console.time("⏱️ 10. updateUpdatedBy");
+
+      await updateCell({
+        division,
+        range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_BY}${rowNumber}`,
+        value: updatedBy || "",
+      });
+
+      console.timeEnd("⏱️ 10. updateUpdatedBy");
+
+
+      // =======================================================
+      // UPDATED TIME
+      // =======================================================
+
+      console.time("⏱️ 11. updateUpdatedTime");
+
+      await updateCell({
+        division,
+        range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_TIME}${rowNumber}`,
+        value: now,
+      });
+
+      console.timeEnd("⏱️ 11. updateUpdatedTime");
+
+
+      // =======================================================
+      // CREATE NEXT CYCLE
+      // =======================================================
+
+      if (remainingQty > 0) {
+
+        console.log(
+          `🔥 Remaining Qty: ${remainingQty}`
+        );
+
+        const skucode =
+          row[PRODUCTION_COLUMNS.SKU_CODE];
+
+
+        // -------------------------------------------------------
+        // CURRENT CYCLE STATUS
+        // -------------------------------------------------------
+
+        console.time("⏱️ 12. updateCurrentCycleStatus");
+
+        await updateCell({
+          division,
+          range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
+          value: "Pending",
+        });
+
+        console.timeEnd("⏱️ 12. updateCurrentCycleStatus");
+
+
+        // -------------------------------------------------------
+        // CREATE NEXT CYCLE
+        // -------------------------------------------------------
+
+        console.time("⏱️ 13. createNextProductionCycle");
+
+        await createNextProductionCycle({
+          division,
+          skucode,
+          currentRow: row,
+          remainingQty,
+        });
+
+        console.timeEnd("⏱️ 13. createNextProductionCycle");
+
+
+        console.log(
+          `🔥 Next cycle created | ${soNo} | Remaining: ${remainingQty}`
+        );
+
+      } else {
+
+        console.time("⏱️ 12. completeFinalCycle");
+
+        await updateCell({
+          division,
+          range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
+          value: "Pending",
+        });
+
+        console.timeEnd("⏱️ 12. completeFinalCycle");
+      }
+
+
+      console.timeEnd(TOTAL_TIMER);
+
+      return true;
+    }
+
+
+    // =========================================================
+    // 8. OTHER PROCESSES
+    // =========================================================
+
+    console.log("🚀 OTHER PROCESS FLOW:", process);
+
+
+    // =========================================================
+    // COMPLETE PROCESS
+    // =========================================================
+
+    console.time("⏱️ 14. completeProcess");
+
+    await updateCell({
+      division,
+      range: `${processMap.endTime}${rowNumber}`,
+      value: now,
     });
-    if (remainingQty > 0) {
-      await Promise.all([
-      updateCell({
+
+    if (processMap.status) {
+      await updateCell({
         division,
-        range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
-        value: "Cycle Completed",
-      }),
-      createNextProductionCycle({
+        range: `${processMap.status}${rowNumber}`,
+        value: "Completed",
+      });
+    }
+
+    console.timeEnd("⏱️ 14. completeProcess");
+
+
+    // =========================================================
+    // UPDATED BY
+    // =========================================================
+
+    console.time("⏱️ 15. updateUpdatedBy");
+
+    await updateCell({
+      division,
+      range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_BY}${rowNumber}`,
+      value: updatedBy || "",
+    });
+
+    console.timeEnd("⏱️ 15. updateUpdatedBy");
+
+
+    // =========================================================
+    // UPDATED TIME
+    // =========================================================
+
+    console.time("⏱️ 16. updateUpdatedTime");
+
+    await updateCell({
+      division,
+      range: `${PRODUCTION_SHEET_COLUMNS.UPDATED_TIME}${rowNumber}`,
+      value: now,
+    });
+
+    console.timeEnd("⏱️ 16. updateUpdatedTime");
+
+
+    // =========================================================
+    // PACKING COMPLETION
+    // =========================================================
+
+    if (process === "packing") {
+
+      console.log("🚀 PACKING COMPLETION FLOW");
+
+      console.time("⏱️ 17. packingCalculations");
+
+      const manufacturedQty = Number(
+        row[PRODUCTION_COLUMNS.PRODUCTION_QTY] || 0
+      );
+
+      const wastageQty = Number(
+        row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0
+      );
+
+      const targetQty = Number(
+        row[PRODUCTION_COLUMNS.TARGET_QTY]
+      );
+
+      if (manufacturedQty > targetQty) {
+        throw new Error(
+          "Production Qty cannot exceed Target Qty"
+        );
+      }
+
+      console.timeEnd("⏱️ 17. packingCalculations");
+
+
+      // =======================================================
+      // FINISHED GOODS
+      // =======================================================
+
+      console.time("⏱️ 18. handleFinishedGoods");
+
+      await handleFinishedGoods({
+        soNo,
+        cycleID,
+        product,
         division,
-        skucode,
-        currentRow: row,
-        remainingQty,
-      })
-      ])
-    
-    } else {
-      // Close Order
+        manufacturedQty,
+        wastageQty,
+        updatedBy,
+      });
+
+      console.timeEnd("⏱️ 18. handleFinishedGoods");
+
+
+      // =======================================================
+      // PACKING STATUS
+      // =======================================================
+
+      console.time("⏱️ 19. packingStatus");
+
       await updateCell({
         division,
         range: `${PRODUCTION_SHEET_COLUMNS.STATUS}${rowNumber}`,
         value: "Completed",
       });
+
+      console.timeEnd("⏱️ 19. packingStatus");
+
+
+      // =======================================================
+      // DISPATCH NOTIFICATION
+      // =======================================================
+
+      console.time("⏱️ 20. dispatchNotification");
+
       sendNotification({
         role: "dispatch",
-        division: division,
+        division,
         type: "dispatch-ready",
         title: "New Sales Order Ready for Dispatch",
-        message: `A new sales order:${soNo} is ready for dispatch`,
+        message: `A new sales order: ${soNo} is ready for dispatch`,
         reference: soNo,
-      }).then(()=>{console.log("Notification sent to dispatch team")}).catch(()=>{
-        console.error("Error in sending notification to dispatch team ")
-      });
-    }
-  }
+      })
+        .then(() => {
+          console.log(
+            "🔥 Notification sent to dispatch team"
+          );
+        })
+        .catch((error) => {
+          console.error(
+            "❌ Error sending dispatch notification:",
+            error
+          );
+        });
 
-  return true;
+      console.timeEnd("⏱️ 20. dispatchNotification");
+    }
+
+
+    // =========================================================
+    // TOTAL
+    // =========================================================
+
+    console.timeEnd(TOTAL_TIMER);
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "❌ completeProductionProcess error:",
+      error
+    );
+
+    console.timeEnd(TOTAL_TIMER);
+
+    throw error;
+  }
 };
+
+
 
 // =====================================================
 // COMPLETE QUALITY + WASTAGE
@@ -514,7 +804,7 @@ export const completeQualityWithWastage = async ({
   await updateCell({
     division,
 
-    range: `${PRODUCTION_SHEET_COLUMNS.QUAILTY_STATUS}${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.QUALITY_STATUS}${rowNumber}`,
 
     value: "Completed",
   });

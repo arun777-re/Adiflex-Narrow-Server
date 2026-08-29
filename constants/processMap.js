@@ -6,96 +6,97 @@ export const PRODUCTION_COLUMNS = {
   SO_NO: 0,                  // A
   CYCLE_ID: 1,               // B
   SKU_CODE: 2,               // C
-  PRODUCT: 3,                // D
-  ORDER_TYPE: 4,             // E
-  TARGET_QTY: 5,             // F
-  DIVISION: 6,               // G
-  PRODUCTION_QTY: 7,         // H
-  JOB_WORK: 8,               // I
+  PRODUCT: 3,
+  CUSTOMER:4,                // D
+  ORDER_TYPE: 5,             // E
+  TARGET_QTY: 6,             // F
+  DIVISION: 7,               // G
+  PRODUCTION_QTY: 8,         // H
+  JOB_WORK: 9,               // I
 
   // ==========================================
   // JOB WORK
   // ==========================================
 
-  JOB_WORK_START: 9,         // J
-  JOB_WORK_END: 10,          // K
+  JOB_WORK_START: 10,         // J
+  JOB_WORK_END: 11,          // K
 
   // ==========================================
   // WARPING
   // ==========================================
 
-  WARPING_START: 11,         // L
-  WARPING: 12,               // M
-  WARPING_END: 13,           // N
+  WARPING_START: 12,         // L
+  WARPING: 13,               // M
+  WARPING_END: 14,           // N
 
   // ==========================================
   // FILLING
   // ==========================================
 
-  FILLING_START: 14,         // O
-  FILLING: 15,               // P
-  FILLING_END: 16,           // Q
+  FILLING_START: 15,         // O
+  FILLING: 16,               // P
+  FILLING_END: 17,           // Q
 
   // ==========================================
   // MACHINE
   // ==========================================
 
-  MACHINE_START: 17,         // R
-  MACHINE: 18,               // S
-  MACHINE_END: 19,           // T
+  MACHINE_START: 18,         // R
+  MACHINE: 19,               // S
+  MACHINE_END: 20,           // T
 
   // ==========================================
   // FINISHING
   // ==========================================
 
-  FINISHING_START: 20,       // U
-  FINISHING: 21,             // V
-  FINISHING_END: 22,         // W
+  FINISHING_START: 21,       // U
+  FINISHING: 22,             // V
+  FINISHING_END: 23,         // W
 
   // ==========================================
   // QUALITY
   // ==========================================
 
-  QUALITY_START: 23,         // X
-  QUALITY: 24,               // Y
-  QUALITY_END: 25,           // Z
+  QUALITY_START: 24,         // X
+  QUALITY: 25,               // Y
+  QUALITY_END: 26,           // Z
 
   // ==========================================
   // WASTAGE
   // ==========================================
 
-  WASTAGE_QTY: 26,            // AA
+  WASTAGE_QTY: 27,            // AA
 
   // ==========================================
   // ROLLING
   // ==========================================
 
-  ROLLING_START: 27,         // AB
-  ROLLING: 28,               // AC
-  ROLLING_END: 29,           // AD
+  ROLLING_START: 28,         // AB
+  ROLLING: 29,               // AC
+  ROLLING_END: 30,           // AD
 
   // ==========================================
   // PACKING
   // ==========================================
 
-  PACKING_START: 30,         // AE
-  PACKING: 31,               // AF
-  PACKING_END: 32,           // AG
+  PACKING_START: 31,         // AE
+  PACKING: 32,               // AF
+  PACKING_END: 33,           // AG
 
   // ==========================================
   // FINAL DATA
   // ==========================================
 
-  STATUS: 33,                // AH
-  UPDATED_BY: 34,             // AI
-  UPDATED_TIME: 35,           // AJ
+  STATUS: 34,                // AH
+  UPDATED_BY: 35,             // AI
+  UPDATED_TIME: 36,           // AJ
 };
 
 // =====================================================
 // PROCESS MAP
 // =====================================================
-export const PROCESS_MAP = {
 
+export const PROCESS_MAP = {
   // ==========================================
   // JOB WORK
   // ==========================================
@@ -105,14 +106,13 @@ export const PROCESS_MAP = {
     previous: null,
     role: "jobWork",
 
-    time: "J",
-    endTime: "K",
+    status: null,
 
-    timeIndex:
-      PRODUCTION_COLUMNS.JOB_WORK_START,
+    time: "K",
+    endTime: "L",
 
-    endTimeIndex:
-      PRODUCTION_COLUMNS.JOB_WORK_END,
+    timeIndex: PRODUCTION_COLUMNS.JOB_WORK_START,
+    endTimeIndex: PRODUCTION_COLUMNS.JOB_WORK_END,
   },
 
   // ==========================================
@@ -124,18 +124,13 @@ export const PROCESS_MAP = {
     previous: "jobWork",
     role: "warping",
 
-    status: "M",
-    time: "L",
-    endTime: "N",
+    status: "N",
+    time: "M",
+    endTime: "O",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.WARPING,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.WARPING_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.WARPING_END,
+    statusIndex: PRODUCTION_COLUMNS.WARPING,
+    timeIndex: PRODUCTION_COLUMNS.WARPING_START,
+    endTimeIndex: PRODUCTION_COLUMNS.WARPING_END,
   },
 
   // ==========================================
@@ -147,18 +142,13 @@ export const PROCESS_MAP = {
     previous: "warping",
     role: "filling",
 
-    status: "P",
-    time: "O",
-    endTime: "Q",
+    status: "Q",
+    time: "P",
+    endTime: "R",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.FILLING,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.FILLING_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.FILLING_END,
+    statusIndex: PRODUCTION_COLUMNS.FILLING,
+    timeIndex: PRODUCTION_COLUMNS.FILLING_START,
+    endTimeIndex: PRODUCTION_COLUMNS.FILLING_END,
   },
 
   // ==========================================
@@ -170,18 +160,13 @@ export const PROCESS_MAP = {
     previous: "filling",
     role: "machine",
 
-    status: "S",
-    time: "R",
-    endTime: "T",
+    status: "T",
+    time: "S",
+    endTime: "U",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.MACHINE,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.MACHINE_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.MACHINE_END,
+    statusIndex: PRODUCTION_COLUMNS.MACHINE,
+    timeIndex: PRODUCTION_COLUMNS.MACHINE_START,
+    endTimeIndex: PRODUCTION_COLUMNS.MACHINE_END,
   },
 
   // ==========================================
@@ -193,18 +178,13 @@ export const PROCESS_MAP = {
     previous: "machine",
     role: "finishing",
 
-    status: "V",
-    time: "U",
-    endTime: "W",
+    status: "W",
+    time: "V",
+    endTime: "X",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.FINISHING,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.FINISHING_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.FINISHING_END,
+    statusIndex: PRODUCTION_COLUMNS.FINISHING,
+    timeIndex: PRODUCTION_COLUMNS.FINISHING_START,
+    endTimeIndex: PRODUCTION_COLUMNS.FINISHING_END,
   },
 
   // ==========================================
@@ -216,18 +196,13 @@ export const PROCESS_MAP = {
     previous: "finishing",
     role: "quality",
 
-    status: "Y",
-    time: "X",
-    endTime: "Z",
+    status: "Z",
+    time: "Y",
+    endTime: "AA",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.QUALITY,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.QUALITY_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.QUALITY_END,
+    statusIndex: PRODUCTION_COLUMNS.QUALITY,
+    timeIndex: PRODUCTION_COLUMNS.QUALITY_START,
+    endTimeIndex: PRODUCTION_COLUMNS.QUALITY_END,
   },
 
   // ==========================================
@@ -239,18 +214,13 @@ export const PROCESS_MAP = {
     previous: "quality",
     role: "rolling",
 
-    status: "AC",
-    time: "AB",
-    endTime: "AD",
+    status: "AD",
+    time: "AC",
+    endTime: "AE",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.ROLLING,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.ROLLING_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.ROLLING_END,
+    statusIndex: PRODUCTION_COLUMNS.ROLLING,
+    timeIndex: PRODUCTION_COLUMNS.ROLLING_START,
+    endTimeIndex: PRODUCTION_COLUMNS.ROLLING_END,
   },
 
   // ==========================================
@@ -262,32 +232,118 @@ export const PROCESS_MAP = {
     previous: "rolling",
     role: "packing",
 
-    status: "AF",
-    time: "AE",
-    endTime: "AG",
+    status: "AG",
+    time: "AF",
+    endTime: "AH",
 
-    statusIndex:
-      PRODUCTION_COLUMNS.PACKING,
-
-    timeIndex:
-      PRODUCTION_COLUMNS.PACKING_START,
-
-    endTimeIndex:
-      PRODUCTION_COLUMNS.PACKING_END,
+    statusIndex: PRODUCTION_COLUMNS.PACKING,
+    timeIndex: PRODUCTION_COLUMNS.PACKING_START,
+    endTimeIndex: PRODUCTION_COLUMNS.PACKING_END,
   },
-
 };
+
+
+// =====================================================
+// PRODUCTION SHEET COLUMNS
+// =====================================================
 
 export const PRODUCTION_SHEET_COLUMNS = {
-  PRODUCTION_QTY: "H",
-  QUALITY_END:"Z",
-  QUAILTY_STATUS:"Y",
-  QUALITY_START: "X",
-  WASTAGE_QTY: "AA",
-  STATUS: "AH",
-  UPDATED_BY: "AI",
-  UPDATED_TIME: "AJ",
+  // ==========================================
+  // BASIC
+  // ==========================================
+
+  SO_NO: "A",
+  CYCLE_ID: "B",
+  SKU_CODE: "C",
+  PRODUCT: "D",
+  CUSTOMER: "E",
+  ORDER_TYPE: "F",
+  TARGET_QTY: "G",
+  DIVISION: "H",
+  PRODUCTION_QTY: "I",
+  JOB_WORK: "J",
+
+  // ==========================================
+  // JOB WORK
+  // ==========================================
+
+  JOB_WORK_START: "K",
+  JOB_WORK_END: "L",
+
+  // ==========================================
+  // WARPING
+  // ==========================================
+
+  WARPING_START: "M",
+  WARPING_STATUS: "N",
+  WARPING_END: "O",
+
+  // ==========================================
+  // FILLING
+  // ==========================================
+
+  FILLING_START: "P",
+  FILLING_STATUS: "Q",
+  FILLING_END: "R",
+
+  // ==========================================
+  // MACHINE
+  // ==========================================
+
+  MACHINE_START: "S",
+  MACHINE_STATUS: "T",
+  MACHINE_END: "U",
+
+  // ==========================================
+  // FINISHING
+  // ==========================================
+
+  FINISHING_START: "V",
+  FINISHING_STATUS: "W",
+  FINISHING_END: "X",
+
+  // ==========================================
+  // QUALITY
+  // ==========================================
+
+  QUALITY_START: "Y",
+  QUALITY_STATUS: "Z",
+  QUALITY_END: "AA",
+
+  // ==========================================
+  // WASTAGE
+  // ==========================================
+
+  WASTAGE_QTY: "AB",
+
+  // ==========================================
+  // ROLLING
+  // ==========================================
+
+  ROLLING_START: "AC",
+  ROLLING_STATUS: "AD",
+  ROLLING_END: "AE",
+
+  // ==========================================
+  // PACKING
+  // ==========================================
+
+  PACKING_START: "AF",
+  PACKING_STATUS: "AG",
+  PACKING_END: "AH",
+
+  // ==========================================
+  // FINAL DATA
+  // ==========================================
+
+  STATUS: "AI",
+  UPDATED_BY: "AJ",
+  UPDATED_TIME: "AK",
 };
+
+
+
+
 
 export const SALES_ORDER_COLUMNS = {
   SO_NO: 0,

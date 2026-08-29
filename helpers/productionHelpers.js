@@ -199,6 +199,9 @@ export const createNextProductionCycle = async ({
     // D - PRODUCT
     currentRow[PRODUCTION_COLUMNS.PRODUCT],
 
+    // E - CUSTOMER
+    currentRow[PRODUCTION_COLUMNS.CUSTOMER],
+
     // E - ORDER TYPE
     currentRow[PRODUCTION_COLUMNS.ORDER_TYPE],
 
