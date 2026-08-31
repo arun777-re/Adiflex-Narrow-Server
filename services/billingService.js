@@ -3,7 +3,7 @@
 // ==========================================
 
 import sheets, { updateCell } from "../config/db.js";
-import { BILLING_COLUMNS } from "../constants/billingColumns.js";
+import { BILLING_COLUMNS, BILLING_COLUMNS_LETTER } from "../constants/billingColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 export const appendBillingOrder = async ({
@@ -18,6 +18,9 @@ export const appendBillingOrder = async ({
   dispatchQty,
 }) => {
   const now = new Date().toLocaleString();
+  const billing_id = crypto.randomUUID();
+  
+    console.log("🔥 New Billing ID:", billing_id);
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: process.env.BILLING_SHEET_ID,
@@ -26,6 +29,7 @@ export const appendBillingOrder = async ({
     insertDataOption: "INSERT_ROWS",
     requestBody: {
       values: [[
+        billing_id,
         soNo,
         skuCode,
         cycleID,
@@ -48,7 +52,7 @@ export const appendBillingOrder = async ({
 export const getBillingOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.BILLING_SHEET_ID,
-    range: `${SHEET_NAMES.BILLING_SHEET}!A:K`,
+    range: `${SHEET_NAMES.BILLING_SHEET}!A:L`,
   });
 
   const rows = response.data.values || [];
@@ -59,6 +63,7 @@ export const getBillingOrders = async () => {
 
   return rows.slice(1).map((row, index) => ({
     rowNumber: index + 2,
+    billingID:row[BILLING_COLUMNS.BILLING_ID] || "",
     soNo: row[BILLING_COLUMNS.SO_NO] || "",
     skuCode: row[BILLING_COLUMNS.SKU_CODE] || "",
     cycleID: row[BILLING_COLUMNS.CYCLE_ID] || "",
@@ -77,19 +82,19 @@ export const getBillingOrders = async () => {
 export const updateBillingStatus = async ({
   soNo,
   skuCode,
-  cycleID,
+  billingID,
   status,
 }) => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.BILLING_SHEET_ID,
-    range: `${SHEET_NAMES.BILLING_SHEET}!A:K`,
+    range: `${SHEET_NAMES.BILLING_SHEET}!A:L`,
   });
 
   const rows = response.data.values || [];
 
   const normalizedSO = String(soNo || "").trim();
   const normalizedSKU = String(skuCode || "").trim();
-  const normalizedCycle = String(cycleID || "").trim();
+  const normalizedBilingID = String(billingID || "").trim();
 
   const rowIndex = rows.findIndex((row, index) => {
     if (index === 0) return false;
@@ -101,19 +106,14 @@ export const updateBillingStatus = async ({
       String(row[BILLING_COLUMNS.SKU_CODE] || "").trim();
 
     const rowCycle =
-      String(row[BILLING_COLUMNS.CYCLE_ID] || "").trim();
+      String(row[BILLING_COLUMNS.BILLING_ID] || "").trim();
 
     // SO + SKU mandatory
     if (
       rowSO !== normalizedSO ||
-      rowSKU !== normalizedSKU
-    ) {
+      rowSKU !== normalizedSKU ||
+      rowCycle !== normalizedBilingID) {
       return false;
-    }
-
-    // Cycle ID optional
-    if (normalizedCycle) {
-      return rowCycle === normalizedCycle;
     }
 
     return true;
@@ -128,7 +128,7 @@ export const updateBillingStatus = async ({
   await updateCell({
     spreadsheetId: process.env.BILLING_SHEET_ID,
     sheetName: SHEET_NAMES.BILLING_SHEET,
-    range: `J${rowNumber}`,
+    range: `${BILLING_COLUMNS_LETTER.BILLING}${rowNumber}`,
     value: status,
   });
 

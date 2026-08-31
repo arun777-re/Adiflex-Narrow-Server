@@ -32,14 +32,15 @@ export const changeBillingStatus = async (req, res) => {
     const {
       soNo,
       skuCode,
-      cycleID,
+      billingID,
       status,
     } = req.body;
 
-    if (!soNo) {
+    console.log("billing req output",req.body,"billing id",billingID)
+    if (!soNo || !billingID) {
       return res.status(400).json({
         success: false,
-        message: "SO No is required",
+        message: "SO No/ billingID is required",
       });
     }
 
@@ -62,7 +63,7 @@ export const changeBillingStatus = async (req, res) => {
     await updateBillingStatus({
       soNo,
       skuCode,
-      cycleID,
+      billingID,
       status,
     });
 
