@@ -1,3 +1,4 @@
+import sheets, { getDatabaseByDivision } from "../config/db.js";
 import { PRODUCTION_COLUMNS } from "../constants/processMap.js";
 
 import {
@@ -8,6 +9,7 @@ import {
   getProductionByProcess,
   updateProductionWastage,
 } from "../services/productionSheet.js";
+import { getSalesOrders } from "../services/salesOrderSheet.js";
 
 // start production process
 export const startProduction = async (req, res) => {
@@ -118,7 +120,7 @@ export const getAllProductionOrders = async (req, res) => {
       cycleID: row[PRODUCTION_COLUMNS.CYCLE_ID] || "",
 
       product: row[PRODUCTION_COLUMNS.PRODUCT] || "",
-      customer:row[PRODUCTION_COLUMNS.CUSTOMER] || "",
+      customer: row[PRODUCTION_COLUMNS.CUSTOMER] || "",
 
       productionTargetQty: Number(row[PRODUCTION_COLUMNS.TARGET_QTY]) || 0,
 
@@ -314,6 +316,132 @@ export const completeQuality = async (req, res) => {
       success: false,
 
       message: error.message,
+    });
+  }
+};
+
+// controllers/salesOrderController.js
+
+export const getAllJobWorkOrders = async (req, res) => {
+  try {
+    const { division } = req.params;
+
+    // ==========================================
+    // 1. VALIDATE DIVISION
+    // ==========================================
+
+    if (!division) {
+      return res.status(400).json({
+        success: false,
+        message: "Division is required",
+      });
+    }
+
+    // ==========================================
+    // 3. GET PRODUCTION ORDERS
+    // ==========================================
+    const rows = await getProductionOrders(division);
+
+    const data = rows.slice(1);
+
+    console.log("rows", rows, "ROWS LENGTH", rows.length);
+
+    if (rows.length <= 1) {
+      return res.status(200).json({
+        success: true,
+        count: rows.length,
+        data: [],
+      });
+    }
+
+    // ==========================================
+    // 5. JOB WORK ORDERS
+    // ==========================================
+
+    const jobWorkOrders = data
+      .filter((row) => {
+        const isJobWork = row[PRODUCTION_COLUMNS.JOB_WORK];
+
+        console.log(
+          "SO:",
+          row[PRODUCTION_COLUMNS.SO_NO],
+          "IS_JOB_WORK INDEX:",
+          PRODUCTION_COLUMNS.JOB_WORK,
+          "VALUE:",
+          isJobWork,
+        );
+
+        return (
+          isJobWork === true ||
+          String(isJobWork).trim().toLowerCase() === "true"
+        );
+      })
+      .map((row) => {
+        // ========================================
+        // JOB WORK STATUS
+        // ========================================
+
+        const jobWorkEndTime = String(
+          row[PRODUCTION_COLUMNS.JOB_WORK_END] || "",
+        ).trim();
+
+        const jobWorkStatus = jobWorkEndTime ? "Fulfilled" : "Pending";
+
+        // ========================================
+        // RESPONSE
+        // ========================================
+
+        return {
+          soNo: row[PRODUCTION_COLUMNS.SO_NO] || "",
+
+          cycleID: row[PRODUCTION_COLUMNS.CYCLE_ID] || "",
+
+          skucode: row[PRODUCTION_COLUMNS.SKU_CODE] || "",
+
+          productName: row[PRODUCTION_COLUMNS.PRODUCT] || "",
+
+          customer: row[PRODUCTION_COLUMNS.CUSTOMER] || "",
+
+          orderType: row[PRODUCTION_COLUMNS.ORDER_TYPE] || "",
+
+          productionTargetQty: Number(
+            row[PRODUCTION_COLUMNS.TARGET_QTY] || 0,
+          ),
+
+          division: row[PRODUCTION_COLUMNS.DIVISION] || "",
+
+          productionQty: Number(row[PRODUCTION_COLUMNS.PRODUCTION_QTY] || 0),
+
+          isJobWork: true,
+
+          jobWorkStartTime: row[PRODUCTION_COLUMNS.JOB_WORK_START] || "",
+
+          jobWorkEndTime,
+
+          jobWorkStatus,
+
+          updatedBy: row[PRODUCTION_COLUMNS.UPDATED_BY] || "",
+
+          updatedTime: row[PRODUCTION_COLUMNS.UPDATED_TIME] || "",
+        };
+      });
+
+    // ==========================================
+    // 6. RESPONSE
+    // ==========================================
+
+    return res.status(200).json({
+      success: true,
+      count: jobWorkOrders.length,
+      data: jobWorkOrders,
+    });
+  } catch (error) {
+    console.error("❌ getAllJobWorkOrders:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch job work orders",
+      error: error.message,
     });
   }
 };

@@ -6,7 +6,8 @@ import {
   startProduction,
   completeProduction,
   updateWastage,
-  completeQuality
+  completeQuality,
+  getAllJobWorkOrders
 } from "../controller/productionController.js";
 
 const router = express.Router();
@@ -47,5 +48,7 @@ router.post(
   "/complete-quality",
   completeQuality
 );
+
+router.get('/job-work/:division',getAllJobWorkOrders);
 
 export default router;
