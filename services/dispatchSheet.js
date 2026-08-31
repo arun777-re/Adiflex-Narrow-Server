@@ -306,6 +306,8 @@ appendBillingOrder({
   soNo,
   skuCode: dispatchRow[DISPATCH_COLUMNS.SKU_CODE],
   cycleID,
+  shippinglocation:dispatchRow[DISPATCH_COLUMNS.SHIPPING_LOCATION] || "",
+  billinglocation:dispatchRow[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
   product,
   customer: dispatchRow[DISPATCH_COLUMNS.CUSTOMER],
   partyPO: dispatchRow[DISPATCH_COLUMNS.PARTY_PO],
