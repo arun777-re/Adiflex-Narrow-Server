@@ -49,35 +49,96 @@ export const appendMultipleSalesOrders = async (values) => {
 };
 
 // append sales order to production process according to division
-export const appendSalesOrderToProductionProcess = async (values, division) => {
-  console.log("Appending sales order to production process for division:", values, division);
-  if (!division) {
-    throw new Error("Division is required");
+export const appendSalesOrderToProductionProcess = async (
+  values,
+  divisions
+) => {
+  try {
+    console.log("values",values)
+    if (!Array.isArray(values) || values.length === 0) {
+      throw new Error("Production values are required");
+    }
+
+    if (!Array.isArray(divisions) || divisions.length === 0) {
+      throw new Error("Division is required");
+    }
+
+    const authClient = await auth.getClient();
+
+    // Unique divisions only
+    const uniqueDivisions = [
+      ...new Set(
+        divisions.map((division) =>
+          String(division).trim().toLowerCase()
+        )
+      ),
+    ];
+
+    await Promise.all(
+      uniqueDivisions.map(async (division) => {
+        // ==========================================
+        // ONLY THIS DIVISION'S ROWS
+        // ==========================================
+
+        const divisionValues = values.filter(
+          (row) =>
+            String(row[7] || "")
+              .trim()
+              .toLowerCase() === division
+        );
+
+        // Nothing to append
+        if (divisionValues.length === 0) {
+          return;
+        }
+
+        // ==========================================
+        // GET DATABASE
+        // ==========================================
+
+        const spreadsheetId =
+          getDatabaseByDivision(division);
+
+        if (!spreadsheetId) {
+          throw new Error(
+            `No database configured for division: ${division}`
+          );
+        }
+
+        console.log(
+          `🚀 Appending ${divisionValues.length} rows to ${division}`
+        );
+
+        // ==========================================
+        // APPEND
+        // ==========================================
+
+        await sheets.spreadsheets.values.append({
+          auth: authClient,
+          spreadsheetId,
+          range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:J`,
+          valueInputOption: "USER_ENTERED",
+          insertDataOption: "INSERT_ROWS",
+          requestBody: {
+            values: divisionValues,
+          },
+        });
+      })
+    );
+
+    console.log(
+      "✅ Production process appended division-wise"
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "❌ appendSalesOrderToProductionProcess:",
+      error
+    );
+
+    throw error;
   }
-
-  const spreadsheetId = getDatabaseByDivision(division);
-
-  if (!spreadsheetId) {
-    throw new Error(`No database configured for division: ${division}`);
-  }
-
-  const authClient = await auth.getClient();
-
-  await sheets.spreadsheets.values.append({
-    auth: authClient,
-
-    spreadsheetId: spreadsheetId,
-
-    range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:J`,
-
-    valueInputOption: "USER_ENTERED",
-
-    insertDataOption: "INSERT_ROWS",
-
-    requestBody: {
-      values,
-    },
-  });
 };
 
 // cancel sales order

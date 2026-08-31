@@ -5,7 +5,6 @@ import {
   createNextProductionCycle,
   handleFinishedGoods,
 } from "../helpers/productionHelpers.js";
-import { appendDispatch } from "./dispatchSheet.js";
 import { handleInternalFG } from "./fgSheets.js";
 import { updateManufacturedQty } from "./salesOrderSheet.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
