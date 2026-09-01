@@ -416,11 +416,15 @@ export const getAllSalesOrders = async (req, res) => {
 };
   try {
     const rows = await getSalesOrders();
-
     // Header remove
     const data = rows.slice(1);
     const validRows = data.filter((row)=> String(row[SALES_COLUMNS.SO_NO] || "").trim() !== "");
-    const orders = validRows.map((row) => ({
+
+    const orders = validRows.map((row) => { 
+      const dispatchStatus = Number(row[SALES_COLUMNS.SO_QTY] || 0) - Number(row[SALES_COLUMNS.DISPATCHED_QTY] || 0);
+      const productionStatus = Number(row[SALES_COLUMNS.PRODUCTION_QTY] || 0) - Number(row[SALES_COLUMNS.MANUFACTURED_QTY] || 0);
+      return{
+
       soNo: row[SALES_COLUMNS.SO_NO] || "",
       date: row[SALES_COLUMNS.DATE] || "",
       skucode: row[SALES_COLUMNS.SKU_CODE] || "",
@@ -448,9 +452,12 @@ export const getAllSalesOrders = async (req, res) => {
 
       orderReceivedBy: row[SALES_COLUMNS.ORDER_RECEIVED_BY] || "",
        
-      status: row[SALES_COLUMNS.OVERALL_STATUS] || "",
+      dispatchstatus: dispatchStatus > 0 ? "Pending Dispatch" : "Dispatched",
+      productionstatus: productionStatus > 0 ? "Pending Production" : "Completed",
       orderAmount:row[SALES_COLUMNS.ORDER_AMOUNT] || 0,
-    }));
+      }
+
+    });
 
     return res.status(200).json({
       success: true,
