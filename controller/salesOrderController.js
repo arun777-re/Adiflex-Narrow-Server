@@ -19,6 +19,7 @@ import { generateNextCycleId } from "../helpers/productionHelpers.js";
 import { consumeFGStockService, findFGStockBySKU } from "../services/fgSheets.js";
 import { getProductBySkuService } from "../services/productSheet.js";
 import { SALES_COLUMNS } from "../constants/salesColumns.js";
+import { getCurrentDateTime } from "../config/db.js";
 
 const processingRequests = new Set();
 
@@ -84,6 +85,8 @@ export const createSalesOrder = async (req, res) => {
       shippinglocation,
       products,
     });
+
+    const now = getCurrentDateTime();
 
     if (processingRequests.has(requestKey)) {
       return res.status(409).json({
@@ -224,7 +227,7 @@ console.log("🔥 GENERATED SO:", soNo);
 
       values.push([
         soNo,
-        date,
+        now,
         item.skucode,
         customer,
         item.product,

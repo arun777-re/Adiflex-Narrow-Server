@@ -1,4 +1,4 @@
-import sheets, { auth, updateCell } from "../config/db.js";
+import sheets, { auth, getCurrentDateTime, updateCell } from "../config/db.js";
 import { FG_COLUMNS, FG_COLUMNS_LETTERS } from "../constants/FGColumns.js";
 import { SALES_COLUMNS } from "../constants/salesColumns.js";
 
@@ -36,7 +36,7 @@ export const findFGStockBySKU = async (skuCode) => {
         .toLowerCase() === String(skuCode).trim().toLowerCase(),
   );
 
-  console.log("FGFGFGFGFG ROW FOUND INVENTORY",response,"indexxxx",index)
+  console.log("FGFGFGFGFG ROW FOUND INVENTORY", response, "indexxxx", index);
   // SKU FG sheet mein nahi mila
   if (index === -1) {
     return {
@@ -93,23 +93,25 @@ export const handleInternalFG = async ({ soNo, product, qty, updatedBy }) => {
     throw new Error("Sales Order not found");
   }
 
-  const orderType = String(salesRow[SALES_COLUMNS.ORDER_TYPE] || "").trim().toLowerCase();
+  const orderType = String(salesRow[SALES_COLUMNS.ORDER_TYPE] || "")
+    .trim()
+    .toLowerCase();
 
   // Only Internal Orders
   if (orderType !== "internal") {
     return true;
   }
 
-  console.log("sales rowwwwww",salesRow);
+  console.log("sales rowwwwww", salesRow);
   const sku = salesRow[SALES_COLUMNS.SKU_CODE];
   const division = salesRow[SALES_COLUMNS.DIVISION];
   const unit = salesRow[SALES_COLUMNS.UNIT] || "METER";
 
   const quantity = Number(qty);
 
-if (!Number.isFinite(quantity) || quantity <= 0) {
-  throw new Error("Valid FG quantity is required");
-}
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error("Valid FG quantity is required");
+  }
   // ==========================================
   // GET FG INVENTORY
   // ==========================================
@@ -130,18 +132,7 @@ if (!Number.isFinite(quantity) || quantity <= 0) {
       insertDataOption: "INSERT_ROWS",
       requestBody: {
         values: [
-          [
-            sku,
-            product,
-            division,
-            unit,
-            quantity,
-            0,
-            0,
-            "",
-            now,
-            updatedBy,
-          ],
+          [sku, product, division, unit, quantity, 0, 0, "", now, updatedBy],
         ],
       },
     });
@@ -161,7 +152,7 @@ if (!Number.isFinite(quantity) || quantity <= 0) {
   await updateCell({
     spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
     sheetName: SHEET_NAMES.INVENTORY_SHEET,
-    division:division,
+    division: division,
     range: `${FG_COLUMNS_LETTERS.AVAILABLE_QTY}${fgStock.rowNumber}`,
     value: newQty,
   });
@@ -170,7 +161,7 @@ if (!Number.isFinite(quantity) || quantity <= 0) {
   await updateCell({
     spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
     sheetName: SHEET_NAMES.INVENTORY_SHEET,
-    division:division,
+    division: division,
     range: `${FG_COLUMNS_LETTERS.LAST_UPDATED}${fgStock.rowNumber}`,
     value: now,
   });
@@ -179,7 +170,7 @@ if (!Number.isFinite(quantity) || quantity <= 0) {
   await updateCell({
     spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
     sheetName: SHEET_NAMES.INVENTORY_SHEET,
-    division:division,
+    division: division,
     range: `${FG_COLUMNS_LETTERS.UPDATED_BY}${fgStock.rowNumber}`,
     value: updatedBy,
   });
@@ -198,7 +189,6 @@ export const getFGAvailableQtyService = async (sku) => {
     }
 
     return Number(fgStock.availableQty) || 0;
-
   } catch (error) {
     throw error;
   }
@@ -224,7 +214,7 @@ export const consumeFGStockService = async ({
 
     if (availableQty < reduceQty) {
       throw new Error(
-        `Insufficient FG Stock. Available: ${availableQty}, Required: ${reduceQty}`
+        `Insufficient FG Stock. Available: ${availableQty}, Required: ${reduceQty}`,
       );
     }
 
@@ -271,14 +261,13 @@ export const consumeFGStockService = async ({
     }
 
     console.log(
-      `📦 FG REDUCED | SKU: ${sku} | Before: ${availableQty} | Reduced: ${reduceQty} | After: ${newQty}`
+      `📦 FG REDUCED | SKU: ${sku} | Before: ${availableQty} | Reduced: ${reduceQty} | After: ${newQty}`,
     );
 
     return {
       ...fgStock,
       availableQty: newQty,
     };
-
   } catch (error) {
     throw error;
   }
@@ -371,6 +360,7 @@ export const addNewProductToFG = async ({
   skuCode,
   product,
   division,
+  availableQty = 0,
 }) => {
   try {
     if (!skuCode) {
@@ -381,29 +371,31 @@ export const addNewProductToFG = async ({
       throw new Error("Product is required");
     }
 
-    const authClient = await auth.getClient();
+    console.log("🔥 BEFORE FG AUTH");
 
-    const sheets = google.sheets({
-      version: "v4",
-      auth: authClient,
-    });
 
-    const now = new Date().toISOString();
+    console.log("🔥 FG AUTH SUCCESS");
+
+   
+
+    const now = getCurrentDateTime();
 
     const newFGRow = [
-      skuCode,       // A - SKU CODE
-      product,       // B - PRODUCT
-      division,      // C - DIVISION
-      0,             // D - AVAILABLE QTY
-      0,             // E - DISPATCH QTY
-      0,             // F - OPENING QTY
-      now,           // G - CREATED AT
+      skuCode, // A - SKU CODE
+      product, // B - PRODUCT
+      division, // C - DIVISION
+      "METER", // D - UNIT
+      availableQty, // E - AVAILABLE QTY
+      0, // F - RESERVED QTY
+      0, // G - DISPATCH QTY
+      "", // H - LOCATION,
+      now, // I - CREATED AT/UPDATED AT
     ];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
 
-      range: `${SHEET_NAMES.FG_SHEET}!A:G`,
+      range: `${SHEET_NAMES.INVENTORY_SHEET}!A:G`,
 
       valueInputOption: "USER_ENTERED",
 
@@ -424,13 +416,8 @@ export const addNewProductToFG = async ({
       success: true,
       skuCode,
     };
-
   } catch (error) {
-
-    console.error(
-      "❌ ADD PRODUCT TO FG ERROR:",
-      error
-    );
+    console.error("❌ ADD PRODUCT TO FG ERROR:", error);
 
     throw error;
   }

@@ -1,9 +1,9 @@
-import sheets, { updateCell } from "../config/db.js";
+import sheets, { getCurrentDateTime, updateCell } from "../config/db.js";
 import { DISPATCH_COLUMNS, DISPATCH_SHEET_COLUMNS } from "../constants/dispatch.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
 import { appendBillingOrder } from "./billingService.js";
-import { getSalesOrders, updateDispatchedQty, updateOverallStatus, updateSalesOrderAfterDispatch } from "./salesOrderSheet.js";
+import { getSalesOrders, updateSalesOrderAfterDispatch } from "./salesOrderSheet.js";
 
 // function to append data to dispatch sheet
 
@@ -228,7 +228,7 @@ export const dispatchOrder = async ({
     status = "Partially Dispatched";
   }
 
-  const now = new Date().toLocaleString();
+  const now = getCurrentDateTime();
 
   // =====================================================
   // DISPATCH SHEET BATCH UPDATE

@@ -5,23 +5,45 @@ import {
   updateProductService,
   updateProductStatusService,
 } from "../services/productSheet.js";
+import {addNewProductToFG } from "../services/fgSheets.js";
 
 // CREATE PRODUCT
 export const createProduct = async (req, res) => {
   try {
+    const { availableQty } = req.body;
 
-    console.log("req.body.....",req.body)
+    console.log("req.body.....", req.body);
+
     const product = await createProductService(req.body);
 
-    res.status(201).json({
+    // Add product to FG if opening quantity is provided
+    if (availableQty && Number(availableQty) > 0) {
+      await addNewProductToFG({
+        skuCode: product.sku,
+        product: product.productName,
+        division: product.division,
+        availableQty: Number(availableQty),
+      })
+        .then((result) => {
+          console.log("FG Stock Added Successfully", result);
+        })
+        .catch((err) => {
+          console.error("Error adding FG Stock", err);
+        });
+    }
+
+    // SUCCESS
+    return res.status(201). json({
       success: true,
       message: "Product created successfully",
       data: product,
     });
+
   } catch (error) {
+    // ERROR
     console.error("Create Product Error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

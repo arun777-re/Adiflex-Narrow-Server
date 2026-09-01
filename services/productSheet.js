@@ -82,7 +82,11 @@ export const createProductService = async ({
   meterPerKG,
   createdBy,
 }) => {
-  const authClient = await auth.getClient();
+console.log("🔥 BEFORE PRODUCT AUTH");
+
+const authClient = await auth.getClient();
+
+console.log("🔥 PRODUCT AUTH SUCCESS");
 
   const rows = await getProductsService();
 // duplicate check 

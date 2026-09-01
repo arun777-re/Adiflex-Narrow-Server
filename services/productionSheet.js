@@ -1,4 +1,4 @@
-import sheets, { getDatabaseByDivision, updateCell } from "../config/db.js";
+import sheets, { getCurrentDateTime, getDatabaseByDivision, updateCell } from "../config/db.js";
 
 import { PROCESS_MAP, PRODUCTION_COLUMNS,PRODUCTION_SHEET_COLUMNS } from "../constants/processMap.js";
 import {
@@ -223,7 +223,7 @@ export const startProductionProcess = async ({
     throw new Error(`${process} is already in progress`);
   }
 
-  const now = new Date().toLocaleString();
+  const now = getCurrentDateTime();
 
   // =====================================================
   // START TIME
@@ -365,7 +365,7 @@ export const completeProductionProcess = async ({
 
     const firstProcess = getFirstProcess(row);
 
-    const now = new Date().toLocaleString();
+    const now = getCurrentDateTime();
 
     console.log("🔥 Process:", process);
     console.log("🔥 First Process:", firstProcess);
