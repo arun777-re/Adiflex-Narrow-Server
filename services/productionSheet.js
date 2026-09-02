@@ -292,8 +292,6 @@ export const completeProductionProcess = async ({
     const rows = await getProductionOrders(division);
 
     console.timeEnd("⏱️ 1. getProductionOrders");
-
-
     // =========================================================
     // 2. FIND PRODUCTION ORDER
     // =========================================================
@@ -357,12 +355,9 @@ export const completeProductionProcess = async ({
     if (currentStatus === "Completed") {
       throw new Error(`${process} is already completed`);
     }
-
-
     // =========================================================
     // 6. FIRST PROCESS
     // =========================================================
-
     const firstProcess = getFirstProcess(row);
 
     const now = getCurrentDateTime();
@@ -370,8 +365,6 @@ export const completeProductionProcess = async ({
     console.log("🔥 Process:", process);
     console.log("🔥 First Process:", firstProcess);
     console.log("🔥 Row Number:", rowNumber);
-
-
     // =========================================================
     // 7. FIRST PROCESS COMPLETION
     // =========================================================
@@ -484,8 +477,6 @@ export const completeProductionProcess = async ({
       });
 
       console.timeEnd("⏱️ 11. updateUpdatedTime");
-
-
       // =======================================================
       // CREATE NEXT CYCLE
       // =======================================================

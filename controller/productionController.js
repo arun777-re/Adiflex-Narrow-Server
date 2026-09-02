@@ -73,14 +73,10 @@ export const completeProduction = async (req, res) => {
     await completeProductionProcess({
       soNo,
       cycleID,
-
       product,
-
       process,
-
       productionQty,
       division,
-
       updatedBy,
     });
 
