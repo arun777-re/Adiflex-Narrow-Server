@@ -114,6 +114,7 @@ export const getAllProductionOrders = async (req, res) => {
 
       soNo: row[PRODUCTION_COLUMNS.SO_NO] || "",
       cycleID: row[PRODUCTION_COLUMNS.CYCLE_ID] || "",
+      skucode: row[PRODUCTION_COLUMNS.SKU_CODE] || "",
 
       product: row[PRODUCTION_COLUMNS.PRODUCT] || "",
       customer: row[PRODUCTION_COLUMNS.CUSTOMER] || "",
