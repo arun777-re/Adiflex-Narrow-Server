@@ -15,6 +15,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import analyticsRoutes from './routes/analysticsRoutes.js';
+import activityRoutes from './routes/activityRoutes.js';
 
 
 
@@ -51,7 +52,7 @@ app.use('/fg',fgRoutes);
 app.use('/billing',billingRoutes);
 app.use('/notifications',notificationRoutes);
 app.use('/analytics',analyticsRoutes);
-
+app.use('/activities',activityRoutes);
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
