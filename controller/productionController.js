@@ -183,7 +183,7 @@ export const getAllProductionOrders = async (req, res) => {
 
       updatedTime: row[PRODUCTION_COLUMNS.UPDATED_TIME] || "",
     }));
-
+console.log("productionOrders", productionOrders);
     return res.status(200).json({
       success: true,
 

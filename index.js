@@ -13,7 +13,8 @@ import productRoutes from './routes/productRoutes.js';
 import fgRoutes from './routes/fgRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
-import notificationRoutes from './routes/notificationRoutes.js'
+import notificationRoutes from './routes/notificationRoutes.js';
+import analyticsRoutes from './routes/analysticsRoutes.js';
 
 
 
@@ -49,7 +50,7 @@ app.use('/dashboard',dashboardRoutes);
 app.use('/fg',fgRoutes);
 app.use('/billing',billingRoutes);
 app.use('/notifications',notificationRoutes);
-
+app.use('/analytics',analyticsRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
