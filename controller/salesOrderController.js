@@ -458,6 +458,9 @@ export const getAllSalesOrders = async (req, res) => {
       dispatchstatus: dispatchStatus > 0 ? "Pending Dispatch" : "Dispatched",
       productionstatus: productionStatus > 0 ? "Pending Production" : "Completed",
       orderAmount:row[SALES_COLUMNS.ORDER_AMOUNT] || 0,
+      shippinglocation: row[SALES_COLUMNS.SHIPPING_LOCATION] || "",
+      billinglocation: row[SALES_COLUMNS.BILLING_LOCATION] || "",
+      route:row[SALES_COLUMNS.ROUTE] || "",
       }
 
     });
