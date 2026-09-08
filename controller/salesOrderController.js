@@ -20,6 +20,7 @@ import { consumeFGStockService, findFGStockBySKU } from "../services/fgSheets.js
 import { getProductBySkuService } from "../services/productSheet.js";
 import { SALES_COLUMNS } from "../constants/salesColumns.js";
 import { getCurrentDateTime } from "../config/db.js";
+import { PRODUCT_COLUMNS } from "../constants/productColumns.js";
 
 const processingRequests = new Set();
 
@@ -496,6 +497,62 @@ export const cancelSalesOrders = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+
+// controllers/salesOrderController.js
+
+export const updateSalesOrder = async (req, res) => {
+  try {
+    const { soNo } = req.params;
+
+    if (!soNo?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Sales Order Number is required",
+      });
+    }
+
+    const {
+      soQty,
+      rate,
+      rateadjustment,
+      finalrate,
+      unit,
+      jobWork,
+      shippinglocation,
+      billinglocation,
+      route,
+      skucode,
+    } = req.body;
+
+    const result = await updateSalesOrderService({
+      soNo: soNo.trim(),
+      soQty,
+      rate,
+      rateadjustment,
+      finalrate,
+      unit,
+      jobWork,
+      shippinglocation,
+      billinglocation,
+      route,
+      skucode,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Sales Order updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("updateSalesOrder:", error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to update Sales Order",
     });
   }
 };

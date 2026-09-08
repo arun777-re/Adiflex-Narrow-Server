@@ -94,3 +94,40 @@ export const login = async (req, res) => {
     });
   }
 };
+
+export const getAllUsers = async (req, res) => {
+  try {
+    console.time("🔥 TOTAL getAllUsers");
+
+    console.time("⚡ getUsers");
+    const allUsers = await getUsers();
+    console.timeEnd("⚡ getUsers");
+
+    console.time("🔄 map users");
+
+    const data = allUsers.slice(1).map((row) => ({
+      name: row[USER_COLUMNS.NAME],
+      role: row[USER_COLUMNS.ROLE],
+      division: row[USER_COLUMNS.DIVISION],
+      userID: row[USER_COLUMNS.USER_ID],
+      status: row[USER_COLUMNS.STATUS] === "TRUE",
+    }));
+
+    console.timeEnd("🔄 map users");
+
+    console.timeEnd("🔥 TOTAL getAllUsers");
+
+    return res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      data,
+    });
+  } catch (error) {
+    console.log(error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to get users",
+    });
+  }
+};

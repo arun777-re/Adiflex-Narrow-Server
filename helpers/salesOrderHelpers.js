@@ -141,7 +141,7 @@ return {
 export const convertToMeter = ({
   qty,
   unit,
-  basicUnit,
+  basicUnit="METER",
   meterPerRoll,
   meterPerKg,
 }) => {
@@ -198,4 +198,133 @@ export const generateNextSoNo = async () => {
   console.log("🔥 GENERATED SO:", nextSo);
 
   return nextSo;
+};
+
+// BATCH UPDATE SALES ORDER CELLS
+export const updateSalesOrderCellsBatch = async ({
+  rowNumber,
+  updates,
+}) => {
+  if (!updates?.length) return;
+
+  const data = updates.map(([columnLetter, value]) => ({
+    range: `${SHEET_NAMES.SALES_ORDERS}!${columnLetter}${rowNumber}`,
+    values: [[value]],
+  }));
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data,
+    },
+  });
+};
+
+export const updateSalesOrderBySoNo = async (soNo, updates) => {
+  try {
+    // =========================================================
+    // 1. GET SALES ORDERS
+    // =========================================================
+
+    const rows = await getSalesOrders();
+
+    if (!rows || rows.length <= 1) {
+      return null;
+    }
+
+    // =========================================================
+    // 2. FIND SALES ORDER
+    // Header = row 0
+    // =========================================================
+
+    const rowIndex = rows.findIndex(
+      (row, index) =>
+        index > 0 &&
+        String(row[SALES_COLUMNS.SO_NO] ?? "").trim() ===
+          String(soNo).trim(),
+    );
+
+    if (rowIndex === -1) {
+      return null;
+    }
+
+    // Array index -> Google Sheet row
+    const sheetRowNumber = rowIndex + 1;
+
+    // =========================================================
+    // 3. PREPARE UPDATE MAP
+    // =========================================================
+
+    const updateMap = {
+      [SALES_COLUMN_LETTERS.SO_QTY]: updates.soQty,
+      [SALES_COLUMN_LETTERS.SO_QTY_IN_METER]: updates.soQtyInMeter,
+
+      [SALES_COLUMN_LETTERS.STANDARD_RATE]: updates.rate,
+      [SALES_COLUMN_LETTERS.RATE_ADJUSTMENT]: updates.rateadjustment,
+      [SALES_COLUMN_LETTERS.FINAL_RATE]: updates.finalrate,
+
+      [SALES_COLUMN_LETTERS.UNIT]: updates.unit,
+      [SALES_COLUMN_LETTERS.JOB_WORK]: updates.jobWork,
+
+      [SALES_COLUMN_LETTERS.SHIPPING_LOCATION]:
+        updates.shippinglocation,
+
+      [SALES_COLUMN_LETTERS.BILLING_LOCATION]:
+        updates.billinglocation,
+
+      [SALES_COLUMN_LETTERS.ROUTE]: updates.route,
+
+      [SALES_COLUMN_LETTERS.SKU_CODE]: updates.skucode,
+    };
+
+    // =========================================================
+    // 4. REMOVE UNDEFINED VALUES
+    // =========================================================
+
+    const updatesToApply = Object.entries(updateMap).filter(
+      ([, value]) => value !== undefined,
+    );
+
+    if (updatesToApply.length === 0) {
+      return {
+        soNo,
+        message: "No fields to update",
+      };
+    }
+
+    // =========================================================
+    // 5. BATCH UPDATE
+    // One Google Sheets API call
+    // =========================================================
+
+    await updateSalesOrderCellsBatch({
+      rowNumber: sheetRowNumber,
+      updates: updatesToApply,
+    });
+
+    // =========================================================
+    // 6. CREATE UPDATED ROW IN MEMORY
+    // No second GET request
+    // =========================================================
+
+    const updatedRow = [...rows[rowIndex]];
+
+    for (const [columnLetter, value] of updatesToApply) {
+      const columnIndex =
+        Object.entries(SALES_COLUMN_LETTERS).find(
+          ([, letter]) => letter === columnLetter,
+        )?.[0];
+
+      if (columnIndex) {
+        updatedRow[SALES_COLUMNS[columnIndex]] = value;
+      }
+    }
+
+    return mapSalesOrderRow(updatedRow);
+  } catch (error) {
+    console.error("updateSalesOrderBySoNo:", error);
+    throw error;
+  }
 };

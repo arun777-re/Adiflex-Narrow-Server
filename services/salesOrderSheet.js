@@ -3,6 +3,7 @@ import sheets from "../config/db.js";
 import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
 import { SALES_COLUMNS ,SALES_COLUMN_LETTERS} from "../constants/salesColumns.js";
 import { SHEET_NAMES,SHEETS_FROM_ENV_ID } from "../constants/sheetNames.js";
+import { convertToMeter, getProductMasterCached } from "../helpers/salesOrderHelpers.js";
 
 const salesOrderSpreadsheetId = process.env.GOOGLE_SHEET_ID;
 
@@ -448,5 +449,126 @@ export const updateSalesOrderAfterDispatch = async ({
   return {
     dispatchedQty: newDispatchedQty,
     status,
+  };
+};
+
+
+export const updateSalesOrderService = async ({
+  soNo,
+  soQty,
+  rate,
+  rateadjustment,
+  finalrate,
+  unit,
+  jobWork,
+  shippinglocation,
+  billinglocation,
+  route,
+  skucode,
+}) => {
+  // =========================================================
+  // 1. VALIDATION
+  // =========================================================
+
+  if (!soNo) {
+    const error = new Error("Sales Order Number is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!skucode) {
+    const error = new Error("SKU Code is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (soQty == null || Number(soQty) < 0) {
+    const error = new Error("Valid SO Quantity is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // =========================================================
+  // 2. GET PRODUCT MASTER
+  // Cached lookup = low latency
+  // =========================================================
+
+  const productRow = await getProductMasterCached(skucode);
+
+  if (!productRow) {
+    const error = new Error(`Product not found for SKU: ${skucode}`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // =========================================================
+  // 3. PRODUCT MASTER DATA
+  // =========================================================
+
+  const basicUnit = productRow[PRODUCT_COLUMNS.UNIT];
+
+  const meterPerRoll =
+    Number(productRow[PRODUCT_COLUMNS.METERPERROLL]) || 0;
+
+  const meterPerKg =
+    Number(productRow[PRODUCT_COLUMNS.METERPERKG]) || 0;
+
+  // =========================================================
+  // 4. CONVERT SO QTY → METER
+  // =========================================================
+
+  const meterQty = await convertToMeter({
+    qty: Number(soQty),
+    unit,
+    basicUnit,
+    meterPerRoll,
+    meterPerKg,
+  });
+
+  // =========================================================
+  // 5. FINAL RATE
+  // =========================================================
+
+  const calculatedFinalRate =
+    rate != null
+      ? Number(rate) + Number(rateadjustment || 0)
+      : Number(finalrate || 0);
+
+  // =========================================================
+  // 6. BUILD UPDATE OBJECT
+  // =========================================================
+
+  const updates = {
+    soQty: Number(soQty),
+    rate: Number(rate || 0),
+    rateadjustment: Number(rateadjustment || 0),
+    finalrate: calculatedFinalRate,
+    unit,
+    jobWork: Boolean(jobWork),
+    shippinglocation: shippinglocation?.trim() || "",
+    billinglocation: billinglocation?.trim() || "",
+    route: route?.trim() || "",
+    skucode,
+    soQtyInMeter: meterQty,
+  };
+
+  // =========================================================
+  // 7. UPDATE SALES ORDER
+  // =========================================================
+
+  const updatedOrder = await updateSalesOrderBySoNo(
+    soNo,
+    updates
+  );
+
+  if (!updatedOrder) {
+    const error = new Error(`Sales Order not found: ${soNo}`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    ...updatedOrder,
+    soQtyInMeter: meterQty,
   };
 };

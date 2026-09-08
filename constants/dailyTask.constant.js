@@ -1,0 +1,62 @@
+export const DAILY_TASK_COLUMNS = {
+  TASK_ID: 0,
+  TASK_TYPE:1,
+  DESCRIPTION: 2,
+  ASSIGNED_TO: 3,
+  ASSIGNED_BY: 4,
+  DEPARTMENT: 5,
+  PRIORITY: 6,
+  DUE_TIME: 7,
+  ACTIVE: 8,
+  CREATED_AT: 9,
+  UPDATED_AT: 10,
+};
+export const DAILY_TASK_COLUMN_LETTERS = {
+  TASK_ID: "A",
+  TASK_TYPE: "B",
+  DESCRIPTION: "C",
+  ASSIGNED_TO: "D",
+  ASSIGNED_BY: "E",
+  DEPARTMENT: "F",
+  PRIORITY: "G",
+  DUE_TIME: "H",
+  ACTIVE: "I",
+  CREATED_AT: "J",
+  UPDATED_AT: "K",
+};
+
+export const DAILY_TASK_LOG_COLUMNS = {
+  LOG_ID: 0,
+  TASK_ID: 1,
+  TASK_DATE: 2,
+  TASK_TYPE:3,
+  ASSIGNED_TO: 4,
+  STATUS: 5,
+  STARTED_AT: 6,
+  COMPLETED_AT: 7,
+  COMPLETION_REMARK: 8,
+  CREATED_AT: 9,
+  UPDATED_AT: 10,
+};
+
+export const DAILY_TASK_LOG_COLUMN_LETTERS = {
+  LOG_ID: "A",
+  TASK_ID: "B",
+  TASK_DATE: "C",
+  TASK_TYPE: "D",
+  ASSIGNED_TO: "E",
+  STATUS: "F",
+  STARTED_AT: "G",
+  COMPLETED_AT: "H",
+  COMPLETION_REMARK: "I",
+  CREATED_AT: "J",
+  UPDATED_AT: "K",
+}; 
+
+export const DAILY_TASK_STATUS = {
+  PENDING: "Pending",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  OVERDUE: "Overdue",
+  CANCELLED: "Cancelled",
+};

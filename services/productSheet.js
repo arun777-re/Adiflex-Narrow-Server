@@ -1,42 +1,129 @@
 import sheets, { auth } from "../config/db.js";
 import { PRODUCT_COLUMNS } from "../constants/productColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
+import {getFromCache,setCache} from '../services/product.cache.service.js'
 
 const spreadsheetId = process.env.PRODUCT_MASTER_SHEET_ID;
-
+    const CACHE_KEY = "products";
 
 
 // get all products service
 export const getProductsService = async () => {
-  const authClient = await auth.getClient();
+  try {
+    console.time("🔥 TOTAL getProductsService");
 
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId,
-    range: `${SHEET_NAMES.PRODUCT_SHEET}!A:N`,
-  });
 
-  const rows = response.data.values || [];
+    // ==========================================
+    // 1. CHECK CACHE
+    // ==========================================
 
-  // Sirf header hai ya sheet empty hai
-  if (rows.length <= 1) {
-    return [];
+    console.time("⚡ Cache check");
+
+    const cachedProducts = getFromCache(CACHE_KEY);
+
+    console.timeEnd("⚡ Cache check");
+
+    if (cachedProducts) {
+      console.log("⚡ PRODUCTS CACHE HIT");
+      console.log(`📦 Products from cache: ${cachedProducts.length}`);
+
+      console.timeEnd("🔥 TOTAL getProductsService");
+
+      return cachedProducts;
+    }
+
+    console.log("🔥 PRODUCTS CACHE MISS");
+
+    // ==========================================
+    // 2. GOOGLE SHEETS CALL
+    // ==========================================
+
+    console.time("📊 Google Sheets");
+
+    const authClient = await auth.getClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      auth: authClient,
+      spreadsheetId,
+      range: `${SHEET_NAMES.PRODUCT_SHEET}!A:N`,
+    });
+
+    console.timeEnd("📊 Google Sheets");
+
+    const rows = response.data.values || [];
+
+    console.log(`📄 Rows received: ${rows.length}`);
+
+    // ==========================================
+    // 3. SHEET EMPTY
+    // ==========================================
+
+    if (rows.length <= 1) {
+      console.log("⚠️ PRODUCT SHEET EMPTY");
+
+      setCache(
+        CACHE_KEY,
+        [],
+        12 * 60 * 60 * 1000
+      );
+
+      console.timeEnd("🔥 TOTAL getProductsService");
+
+      return [];
+    }
+
+    // ==========================================
+    // 4. MAP PRODUCTS
+    // ==========================================
+
+    console.time("🔄 Map products");
+
+    const products = rows.slice(1).map((row) => ({
+      sku: row[PRODUCT_COLUMNS.SKU] || "",
+      productName: row[PRODUCT_COLUMNS.PRODUCT_NAME] || "",
+      rate: row[PRODUCT_COLUMNS.RATE] || "",
+      division: row[PRODUCT_COLUMNS.DIVISION] || "",
+      unit: row[PRODUCT_COLUMNS.UNIT] || "",
+      color: row[PRODUCT_COLUMNS.COLOR] || "",
+      meterPerRoll: row[PRODUCT_COLUMNS.METERPERROLL] || "",
+      meterPerKG: row[PRODUCT_COLUMNS.METERPERKG] || "",
+      size: row[PRODUCT_COLUMNS.SIZE] || "",
+      status: row[PRODUCT_COLUMNS.STATUS] || "",
+      updatedBy: row[PRODUCT_COLUMNS.UPDATED_BY] || "",
+      updatedAt: row[PRODUCT_COLUMNS.UPDATED_AT] || "",
+    }));
+
+    console.timeEnd("🔄 Map products");
+
+    // ==========================================
+    // 5. SAVE IN CACHE
+    // ==========================================
+
+    console.time("💾 Set product cache");
+
+    setCache(
+      CACHE_KEY,
+      products,
+      12 * 60 * 60 * 1000
+    );
+
+    console.timeEnd("💾 Set product cache");
+
+    console.log(`📦 Products cached: ${products.length}`);
+    console.log("🔥 PRODUCTS CACHE UPDATED");
+
+    // ==========================================
+    // TOTAL TIME
+    // ==========================================
+
+    console.timeEnd("🔥 TOTAL getProductsService");
+
+    return products;
+
+  } catch (error) {
+    console.error("❌ getProductsService error:", error);
+    throw error;
   }
-
-  return rows.slice(1).map((row) => ({
-    sku: row[PRODUCT_COLUMNS.SKU] || "",
-    productName: row[PRODUCT_COLUMNS.PRODUCT_NAME] || "",
-    rate:row[PRODUCT_COLUMNS.RATE] || "",
-    division: row[PRODUCT_COLUMNS.DIVISION] || "",
-    unit: row[PRODUCT_COLUMNS.UNIT] || "",
-    color: row[PRODUCT_COLUMNS.COLOR] || "",
-    meterPerRoll:row[PRODUCT_COLUMNS.METERPERROLL],
-    meterPerKG:row[PRODUCT_COLUMNS.METERPERKG],
-    size: row[PRODUCT_COLUMNS.SIZE] || "",
-    status: row[PRODUCT_COLUMNS.STATUS] || "",
-    updatedBy: row[PRODUCT_COLUMNS.UPDATED_BY] || "",
-    updatedAt: row[PRODUCT_COLUMNS.UPDATED_AT] || "",
-  }));
 };
 
 
@@ -147,6 +234,7 @@ console.log("🔥 PRODUCT AUTH SUCCESS");
     },
   });
 
+  
   return {
     sku,
     productName,
