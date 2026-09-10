@@ -44,21 +44,44 @@ export const updateCell = async ({
   range,
   value,
 }) => {
+  try {
+    const SPREADSHEET_ID =
+      spreadsheetId || getDatabaseByDivision(division);
 
-  const SPREADSHEET_ID =
-    spreadsheetId || getDatabaseByDivision(division);
+    // ==========================================
+    // HANDLE SINGLE VALUE OR FULL ROW
+    // ==========================================
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheetName}!${range}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[value]],
-    },
-  });
+    const values = Array.isArray(value)
+      ? [value]
+      : [[value]];
 
+    console.log("📝 UPDATE CELL");
+    console.log("   Sheet:", sheetName);
+    console.log("   Range:", range);
+    console.log(
+      "   Value Type:",
+      Array.isArray(value) ? "ROW ARRAY" : "SINGLE VALUE"
+    );
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values,
+      },
+    });
+
+    console.log("✅ CELL UPDATED SUCCESSFULLY");
+
+    return true;
+
+  } catch (error) {
+    console.error("❌ updateCell error:", error);
+    throw error;
+  }
 };
-
 
 export const appendCell = async ({
   division,

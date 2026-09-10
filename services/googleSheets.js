@@ -6,7 +6,7 @@ import { SHEET_NAMES } from "../constants/sheetNames.js";
 const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
 // cache for users 
-const USERS_CACHE_TTL = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+const USERS_CACHE_TTL =  60 * 1000; // 8 hours in milliseconds
 
 let usersCache = null;
 let usersCacheTime = 0;
@@ -25,7 +25,7 @@ export const getUsers = async () => {
     }
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${SHEET_NAMES.USERS}!A:F`,
+      range: `${SHEET_NAMES.USERS}!A:G`,
     });
 
     usersCache = response.data.values || [];

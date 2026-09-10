@@ -6,7 +6,8 @@ export const USER_COLUMNS = {
     DIVISION:2,
     PASSWORD:3,
     STATUS:4,
-    USER_ID:5
+    DEPARTMENT:5,
+    USER_ID:6
 }
 
 // PUSH SUBSCRIPTION COLUMNS 

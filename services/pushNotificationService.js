@@ -2,7 +2,6 @@ import webpush from "web-push";
 import { appendCell,updateCell } from "../config/db.js";
 
 import {
-  getUsers,
   getPushSubscriptions,
   getSubscriptionsForNotification,
 } from "../helpers/pushNotificationHelper.js";
@@ -13,6 +12,7 @@ import {
 } from "../constants/userColumns.js";
 
 import {SHEET_NAMES} from '../constants/sheetNames.js'
+import { getUsers } from "./googleSheets.js";
 
 // =====================================================
 // VAPID
@@ -240,58 +240,183 @@ export const savePushSubscription = async ({
   deviceName = "Unknown Device",
   ipAddress = "",
 }) => {
+  console.log("\n==========================================");
+  console.log("🔔 SAVE PUSH SUBSCRIPTION START");
+  console.log("==========================================");
+  console.log("👤 Incoming User ID:", userId);
 
   if (!userId) {
     throw new Error("User ID is required");
   }
 
   if (!subscription?.endpoint) {
-    throw new Error(
-      "Invalid push subscription"
-    );
+    throw new Error("Invalid push subscription");
   }
 
-  const { endpoint, keys } =
-    subscription;
+  const { endpoint, keys } = subscription;
 
   if (!keys?.p256dh || !keys?.auth) {
-    throw new Error(
-      "Invalid push subscription keys"
-    );
+    throw new Error("Invalid push subscription keys");
   }
 
   // ===================================================
   // GET USER + SUBSCRIPTIONS IN PARALLEL
   // ===================================================
 
-  const [users, subscriptions] =
-    await Promise.all([
-      getUsers(),
-      getPushSubscriptions(),
-    ]);
+  console.log("⚡ Fetching users + subscriptions...");
+
+  const [users, subscriptions] = await Promise.all([
+    getUsers(),
+    getPushSubscriptions(),
+  ]);
+
+  console.log("\n==========================================");
+  console.log("🔥 PUSH - USERS DEBUG");
+  console.log("==========================================");
+
+  console.log("👥 USERS LENGTH:", users?.length);
+  console.log(
+    "🔢 USER_ID COLUMN INDEX:",
+    USER_COLUMNS.USER_ID
+  );
+  console.log("🔎 LOOKING FOR USER:", userId);
+
+  // ===================================================
+  // PRINT ONLY NAME + USER ID
+  // ===================================================
+
+  console.log("\n📋 USER ROWS:");
+
+  users.forEach((row, index) => {
+    console.log(
+      `ROW ${index} =>`,
+      "NAME:",
+      row?.[USER_COLUMNS.NAME],
+      "| USER_ID:",
+      row?.[USER_COLUMNS.USER_ID]
+    );
+  });
+
+  // ===================================================
+  // DIRECT OPERATOR CHECK
+  // ===================================================
+
+  console.log("\n🎯 DIRECT ROW CHECK:");
+
+  const operatorRow = users?.find(
+    (row, index) =>
+      index > 0 &&
+      String(row?.[USER_COLUMNS.NAME] || "")
+        .trim()
+        .toLowerCase() === "operator"
+  );
+
+  console.log(
+    "OPERATOR ROW:",
+    operatorRow
+      ? {
+          name: operatorRow[USER_COLUMNS.NAME],
+          userID: operatorRow[USER_COLUMNS.USER_ID],
+        }
+      : "NOT FOUND"
+  );
+
+  console.log(
+    "OPERATOR USER_ID:",
+    operatorRow?.[USER_COLUMNS.USER_ID]
+  );
+
+  // ===================================================
+  // NORMALIZED USER ID
+  // ===================================================
+
+  const normalizedUserId = String(userId || "")
+    .trim()
+    .toLowerCase();
+
+  console.log("\n🔎 NORMALIZED USER ID:");
+  console.log("Incoming:", normalizedUserId);
+
+  // ===================================================
+  // CHECK EVERY USER FOR MATCH
+  // ===================================================
+
+  console.log("\n🧪 USER ID MATCH TEST:");
+
+  users.forEach((row, index) => {
+    if (index === 0) return;
+
+    const sheetUserId = String(
+      row?.[USER_COLUMNS.USER_ID] || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const isMatch = sheetUserId === normalizedUserId;
+
+    console.log(
+      `ROW ${index}:`,
+      "Sheet USER_ID =",
+      sheetUserId,
+      "| Match =",
+      isMatch
+    );
+  });
 
   // ===================================================
   // FIND USER
   // ===================================================
 
-  const userRowIndex =
-    users.findIndex(
-      (row, index) =>
-        index > 0 &&
-        String(
-          row[USER_COLUMNS.USER_ID] || ""
-        ).trim() ===
-        String(userId).trim()
-    );
+  const userRowIndex = users.findIndex(
+    (row, index) => {
+      if (index === 0) return false;
+
+      const sheetUserId = String(
+        row?.[USER_COLUMNS.USER_ID] || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      return sheetUserId === normalizedUserId;
+    }
+  );
+
+  // ===================================================
+  // FINAL USER SEARCH RESULT
+  // ===================================================
+
+  console.log("\n==========================================");
+  console.log("🎯 USER SEARCH RESULT");
+  console.log("==========================================");
+  console.log("USER ROW INDEX:", userRowIndex);
 
   if (userRowIndex === -1) {
-    throw new Error(
-      `User not found: ${userId}`
+    console.log("❌ USER NOT FOUND");
+    console.log("Incoming User ID:", userId);
+    console.log(
+      "USER_ID COLUMN INDEX:",
+      USER_COLUMNS.USER_ID
     );
+    console.log("==========================================\n");
+
+    throw new Error(`User not found: ${userId}`);
   }
 
-  const userRow =
-    users[userRowIndex];
+  console.log("✅ USER FOUND!");
+
+  const userRow = users[userRowIndex];
+
+  console.log("Matched Row:", {
+    rowIndex: userRowIndex,
+    name: userRow?.[USER_COLUMNS.NAME],
+    userID: userRow?.[USER_COLUMNS.USER_ID],
+    role: userRow?.[USER_COLUMNS.ROLE],
+    division: userRow?.[USER_COLUMNS.DIVISION],
+  });
+
+  // ===================================================
+  // GET USER DETAILS
+  // ===================================================
 
   const userName =
     userRow[USER_COLUMNS.NAME] || "";
@@ -306,34 +431,43 @@ export const savePushSubscription = async ({
   // FIND EXISTING SUBSCRIPTION
   // ===================================================
 
-  const existingIndex =
-    subscriptions.findIndex(
-      (row, index) =>
-        index > 0 &&
-        String(
-          row[
-            SUBSCRIPTION_COLUMNS.ENDPOINT
-          ] || ""
-        ).trim() ===
-        String(endpoint).trim()
-    );
+  console.log("\n==========================================");
+  console.log("🔍 CHECKING EXISTING SUBSCRIPTION");
+  console.log("==========================================");
 
-  const now =
-    new Date().toISOString();
+  console.log(
+    "📦 SUBSCRIPTIONS LENGTH:",
+    subscriptions?.length
+  );
+
+  const existingIndex = subscriptions.findIndex(
+    (row, index) =>
+      index > 0 &&
+      String(
+        row[SUBSCRIPTION_COLUMNS.ENDPOINT] || ""
+      ).trim() === String(endpoint).trim()
+  );
+
+  console.log(
+    "EXISTING SUBSCRIPTION INDEX:",
+    existingIndex
+  );
+
+  const now = new Date().toISOString();
 
   // ===================================================
   // UPDATE
   // ===================================================
 
   if (existingIndex !== -1) {
+    console.log("♻️ Existing subscription found");
 
     const existingRow =
       subscriptions[existingIndex];
 
     const subscriptionId =
       existingRow[
-        SUBSCRIPTION_COLUMNS
-          .SUBSCRIPTION_ID
+        SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID
       ];
 
     const updatedRow = [
@@ -348,8 +482,7 @@ export const savePushSubscription = async ({
       deviceName,
       ipAddress,
       existingRow[
-        SUBSCRIPTION_COLUMNS
-          .CREATED_AT
+        SUBSCRIPTION_COLUMNS.CREATED_AT
       ] || now,
       now,
       "ACTIVE",
@@ -369,8 +502,12 @@ export const savePushSubscription = async ({
     });
 
     console.log(
-      "♻️ PUSH SUBSCRIPTION UPDATED",
+      "♻️ PUSH SUBSCRIPTION UPDATED:",
       subscriptionId
+    );
+
+    console.log(
+      "==========================================\n"
     );
 
     return {
@@ -383,6 +520,9 @@ export const savePushSubscription = async ({
   // ===================================================
   // CREATE
   // ===================================================
+
+  console.log("🆕 No existing subscription found");
+  console.log("➡️ Creating new subscription...");
 
   const subscriptionId =
     `SUB${Date.now()}`;
@@ -416,8 +556,12 @@ export const savePushSubscription = async ({
   });
 
   console.log(
-    "🆕 PUSH SUBSCRIPTION CREATED",
+    "🆕 PUSH SUBSCRIPTION CREATED:",
     subscriptionId
+  );
+
+  console.log(
+    "==========================================\n"
   );
 
   return {

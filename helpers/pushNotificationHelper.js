@@ -29,23 +29,7 @@ export const getPushSubscriptions = async () => {
 };
 
 
-// =====================================================
-// GET USERS
-// =====================================================
 
-export const getUsers = async () => {
-
-  const response =
-    await sheets.spreadsheets.values.get({
-      spreadsheetId:
-        process.env.GOOGLE_SHEET_ID,
-
-      range:
-        `${SHEET_NAMES.USERS}!A:F`,
-    });
-
-  return response.data.values || [];
-};
 
 
 // =====================================================

@@ -3,94 +3,142 @@ import { getUsers } from "../services/googleSheets.js";
 
 export const login = async (req, res) => {
   try {
-    const { role, division, password } = req.body;
-    console.log("body",req.body)
+    console.log("\n==========================================");
+    console.log("🔐 LOGIN REQUEST");
+    console.log("==========================================");
+
+    const { userID, password } = req.body;
+
+    console.log("coming request . . . . . . . . . . .. . ", req.body)
+
+    console.log("📥 Login payload:", {
+      userID,
+      passwordProvided: !!password,
+    });
 
     // ==========================================
     // VALIDATION
     // ==========================================
 
-    if (!role || !division || !password) {
+    if (!userID || !password) {
+      console.log("❌ LOGIN VALIDATION FAILED");
+      console.log("   userID:", !!userID);
+      console.log("   password:", !!password);
+
       return res.status(400).json({
         success: false,
-
-        message: "Role, Division and Password are required",
+        message: "User ID and Password are required",
       });
     }
 
+    console.log("✅ Login payload validation passed");
+
     // ==========================================
-    // GET USERS
+    // GET USERS FROM CACHE
     // ==========================================
+
+    console.log("⚡ Fetching users...");
 
     const users = await getUsers();
 
-    // Remove header row
+    console.log("USERSS",users);
 
-    const rows = users.slice(1);
+    console.log("👥 Users received:", users.length);
+    console.log(
+      "👥 User records excluding header:",
+      Math.max(users.length - 1, 0)
+    );
+
+    // ==========================================
+    // NORMALIZE LOGIN DATA
+    // ==========================================
+
+    const normalizedUserID = String(userID)
+      .trim()
+      .toLowerCase();
+
+    const normalizedPassword = String(password).trim();
+
+    console.log("🔎 Searching user...");
+    console.log("   User ID:", normalizedUserID);
 
     // ==========================================
     // FIND USER
     // ==========================================
 
-    const user = rows.find((row) => {
-  const userRole = String(row[USER_COLUMNS.ROLE] || "")
-    .trim()
-    .toLowerCase();
+    const user = users.slice(1).find((row) => {
+      const sheetUserID = String(
+        row[USER_COLUMNS.USER_ID] || ""
+      )
+        .trim()
+        .toLowerCase();
 
-  const userDivision = String(row[USER_COLUMNS.DIVISION] || "")
-    .trim()
-    .toLowerCase();
+      const sheetPassword = String(
+        row[USER_COLUMNS.PASSWORD] || ""
+      ).trim();
 
-  const userPassword = String(row[USER_COLUMNS.PASSWORD] || "").trim();
+      const sheetStatus = String(
+        row[USER_COLUMNS.STATUS] || ""
+      )
+        .trim()
+        .toLowerCase();
 
-  const userStatus = String(row[USER_COLUMNS.STATUS] || "")
-    .trim()
-    .toLowerCase();
-
-
-  return (
-    userRole === role.trim().toLowerCase() &&
-    userDivision === division.trim().toLowerCase() &&
-    userPassword === password.trim() &&
-    userStatus === "true" 
-  );
-});
+      return (
+        sheetUserID === normalizedUserID &&
+        sheetPassword === normalizedPassword &&
+        sheetStatus === "true"
+      );
+    });
 
     // ==========================================
     // INVALID LOGIN
     // ==========================================
 
     if (!user) {
+      console.log("❌ LOGIN FAILED");
+      console.log("   User ID:", normalizedUserID);
+      console.log("   Reason: Invalid User ID or Password");
+      console.log("==========================================\n");
+
       return res.status(401).json({
         success: false,
-
-        message: "Invalid Role, Division or Password",
+        message: "Invalid User ID or Password",
       });
     }
 
     // ==========================================
     // SUCCESS
     // ==========================================
+
+    console.log("✅ LOGIN SUCCESS");
+    console.log("   User ID:", user[USER_COLUMNS.USER_ID]);
+    console.log("   Name:", user[USER_COLUMNS.NAME]);
+    console.log("   Role:", user[USER_COLUMNS.ROLE]);
+    console.log("   Division:", user[USER_COLUMNS.DIVISION]);
+    console.log("==========================================\n");
+
     return res.status(200).json({
       success: true,
-
       message: "Login Successful",
 
       user: {
         name: user[USER_COLUMNS.NAME],
-
         role: user[USER_COLUMNS.ROLE],
-
         division: user[USER_COLUMNS.DIVISION],
         userID: user[USER_COLUMNS.USER_ID],
+        department:user[USER_COLUMNS.department],
       },
     });
+
   } catch (error) {
-    console.error("Error in login", error);
+    console.error("\n❌ LOGIN ERROR");
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+    console.log("==========================================\n");
+
     return res.status(500).json({
       success: false,
-
-      message: error.message,
+      message: "Login failed",
     });
   }
 };

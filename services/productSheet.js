@@ -1,7 +1,7 @@
 import sheets, { auth } from "../config/db.js";
 import { PRODUCT_COLUMNS } from "../constants/productColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
-import {getFromCache,setCache} from '../services/product.cache.service.js'
+import {getFromCache,setCache,clearCache} from '../services/product.cache.service.js'
 
 const spreadsheetId = process.env.PRODUCT_MASTER_SHEET_ID;
     const CACHE_KEY = "products";
@@ -234,7 +234,8 @@ console.log("🔥 PRODUCT AUTH SUCCESS");
     },
   });
 
-  
+  clearCache();
+
   return {
     sku,
     productName,
@@ -318,6 +319,7 @@ console.log("actual row of data",actualRow)
     },
   });
 
+  clearCache()
   return await getProductBySkuService(sku);
 };
 

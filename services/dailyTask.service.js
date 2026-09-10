@@ -2,6 +2,9 @@ import {
   getDailyTasks,
   appendDailyTask,
   updateDailyTaskCellsBatch,
+  appendDailyTaskLog,
+  getDailyTaskLogs,
+  normalizeTaskDate
 } from "../utils/dailyTask.utils.js";
 
 import {
@@ -27,7 +30,6 @@ export const getAllDailyTasks = async () => {
 
     return rows.slice(1).map((row) => ({
       taskId: row[DAILY_TASK_COLUMNS.TASK_ID] || "",
-      taskName: row[DAILY_TASK_COLUMNS.TASK_NAME] || "",
       description: row[DAILY_TASK_COLUMNS.DESCRIPTION] || "",
       assignedTo: row[DAILY_TASK_COLUMNS.ASSIGNED_TO] || "",
       assignedBy: row[DAILY_TASK_COLUMNS.ASSIGNED_BY] || "",
@@ -48,29 +50,26 @@ export const getAllDailyTasks = async () => {
 export const createDailyTask = async (taskData) => {
   try {
     const {
-      taskName,
       taskType = "DAILY",
       description = "",
       assignedTo,
-      assignedBy,
+      assignedBy="ADMIN",
       department = "",
-      priority = "Medium",
+      taskOrder = "",
+      priority = "",
       dueTime = "",
+      active = true,
     } = taskData;
 
     // =========================================================
-    // VALIDATION
+    // 1. VALIDATION
     // =========================================================
 
-    if (!taskName || !assignedTo || !assignedBy) {
+    if (!description || !assignedTo) {
       throw new Error(
-        "taskName, assignedTo and assignedBy are required"
+        "description, assignedTo are required"
       );
     }
-
-    // =========================================================
-    // VALID TASK TYPE
-    // =========================================================
 
     const allowedTaskTypes = ["DAILY", "DELEGATION"];
 
@@ -81,7 +80,7 @@ export const createDailyTask = async (taskData) => {
     }
 
     // =========================================================
-    // GET EXISTING TASKS
+    // 2. GET EXISTING TASKS
     // =========================================================
 
     const existingTasks = await getDailyTasks();
@@ -89,7 +88,7 @@ export const createDailyTask = async (taskData) => {
     const taskRows = existingTasks.slice(1);
 
     // =========================================================
-    // GENERATE NEXT TASK ID
+    // 3. GENERATE NEXT TASK ID
     // =========================================================
 
     const taskNumbers = taskRows
@@ -98,7 +97,7 @@ export const createDailyTask = async (taskData) => {
 
         if (!id) return 0;
 
-        const match = String(id).match(/TASK(\d+)/);
+        const match = String(id).match(/TSK(\d+)/);
 
         return match ? Number(match[1]) : 0;
       })
@@ -109,66 +108,50 @@ export const createDailyTask = async (taskData) => {
         ? Math.max(...taskNumbers) + 1
         : 1;
 
-    const taskId = `TASK${String(nextNumber).padStart(4, "0")}`;
+    const taskId = `TSK${String(nextNumber).padStart(4, "0")}`;
 
     // =========================================================
-    // TIMESTAMP
+    // 4. TIMESTAMP
     // =========================================================
 
     const now = getCurrentDateTime();
 
     // =========================================================
-    // NEW ROW
+    // 5. NEW ROW
     // =========================================================
-    // A  TASK_ID
-    // B  TASK_NAME
-    // C  TASK_TYPE
-    // D  DESCRIPTION
-    // E  ASSIGNED_TO
-    // F  ASSIGNED_BY
-    // G  DEPARTMENT
-    // H  PRIORITY
-    // I  DUE_TIME
-    // J  ACTIVE
-    // K  CREATED_AT
-    // L  UPDATED_AT
 
     const newRow = [
-      taskId,
-      taskName,
-      taskType,
-      description,
-      assignedTo,
-      assignedBy,
-      department,
-      priority,
-      dueTime,
-      true,
-      now,
-      now,
+      taskId,        // A TASK_ID
+      taskType,      // B TASK_TYPE
+      description,   // C DESCRIPTION
+      assignedTo,    // D ASSIGNED_TO
+      assignedBy,    // E ASSIGNED_BY
+      department,    // F DEPARTMENT
+      taskOrder,     // G TASK_ORDER
+      priority,      // H PRIORITY
+      dueTime,       // I DUE_TIME
+      active,        // J ACTIVE
+      now,           // K CREATED_AT
+      now,           // L UPDATED_AT
     ];
-
-    // =========================================================
-    // SAVE TO GOOGLE SHEET
-    // =========================================================
 
     await appendDailyTask(newRow);
 
     // =========================================================
-    // RETURN CREATED TASK
+    // 6. RETURN CREATED TASK
     // =========================================================
 
     return {
       taskId,
-      taskName,
       taskType,
       description,
       assignedTo,
       assignedBy,
       department,
+      taskOrder,
       priority,
       dueTime,
-      active: true,
+      active,
       createdAt: now,
       updatedAt: now,
     };
@@ -245,6 +228,330 @@ export const updateDailyTask = async (taskId, updates) => {
     };
   } catch (error) {
     console.error("updateDailyTask error:", error);
+    throw error;
+  }
+};
+
+
+// COMPLETE DAILY TASK SERVICE FOR EMPLOYEES
+export const completeDailyTaskService = async ({
+  taskId,
+  userID,
+}) => {
+  try {
+    console.log("\n========================================");
+    console.log("🚀 COMPLETE DAILY TASK START");
+    console.log("========================================");
+
+    console.log("📥 INPUT taskId:", taskId);
+    console.log("📥 INPUT userID:", userID);
+
+    // =========================================================
+    // 1. GET ALL TASKS
+    // =========================================================
+
+    const allTasks = await getAllDailyTasks();
+
+    console.log("📋 ALL TASKS LENGTH:", allTasks?.length);
+    console.log("📋 ALL TASKS:", allTasks);
+
+    const task = allTasks.find(
+      (task) =>
+        String(task.taskId || "").trim() ===
+        String(taskId || "").trim()
+    );
+
+    console.log("🎯 FOUND TASK:", task);
+
+    if (!task) {
+      console.log("❌ TASK NOT FOUND");
+      throw new Error("Daily task not found");
+    }
+
+    // =========================================================
+    // 2. CHECK TASK ASSIGNMENT
+    // =========================================================
+
+    console.log("👤 TASK ASSIGNED TO:", task.assignedTo);
+    console.log("👤 CURRENT USER ID:", userID);
+
+    console.log(
+      "🔍 ASSIGNMENT MATCH:",
+      String(task.assignedTo || "").trim() ===
+        String(userID || "").trim()
+    );
+
+    if (
+      String(task.assignedTo || "").trim() !==
+      String(userID || "").trim()
+    ) {
+      throw new Error(
+        "This task is not assigned to this employee"
+      );
+    }
+
+    // =========================================================
+    // 3. CHECK ACTIVE TASK
+    // =========================================================
+
+    console.log("🟢 TASK ACTIVE VALUE:", task.active);
+    console.log(
+      "🟢 TASK ACTIVE TYPE:",
+      typeof task.active
+    );
+
+    if (task.active !== true) {
+      console.log("❌ TASK IS NOT ACTIVE");
+      throw new Error("This task is inactive");
+    }
+
+    // =========================================================
+    // 4. TODAY'S DATE
+    // =========================================================
+
+    const now = getCurrentDateTime();
+
+const taskDate = normalizeTaskDate(now);
+
+    console.log("🕐 CURRENT DATETIME:", now);
+    console.log("📅 TASK DATE:", taskDate);
+
+    // =========================================================
+    // 5. GET EXISTING LOGS
+    // =========================================================
+
+    const allLogs = await getDailyTaskLogs();
+
+    console.log("📚 ALL LOGS LENGTH:", allLogs?.length);
+    console.log("📚 ALL LOGS:", allLogs);
+
+    // =========================================================
+    // 6. FILTER RELEVANT LOGS
+    // =========================================================
+
+    const relevantLogs = allLogs.filter((log) => {
+      const logTaskId = String(log.taskId || "").trim();
+      const logUserID = String(log.userID || "").trim();
+
+      return (
+        logTaskId === String(taskId || "").trim() &&
+        logUserID === String(userID || "").trim()
+      );
+    });
+
+    console.log(
+      "🔎 RELEVANT LOGS FOR THIS TASK + USER:",
+      relevantLogs
+    );
+
+    // =========================================================
+    // 7. CHECK EACH LOG
+    // =========================================================
+
+    relevantLogs.forEach((log, index) => {
+      const logTaskDate = String(
+        log.taskDate || ""
+      )
+        .trim()
+        .split(" ")[0];
+
+      const logStatus = String(
+        log.status || ""
+      )
+        .trim()
+        .toUpperCase();
+
+      console.log(`\n🔍 LOG CHECK #${index + 1}`);
+
+      console.log("   LOG ID:", log.logId);
+
+      console.log(
+        "   LOG TASK ID:",
+        log.taskId
+      );
+
+      console.log(
+        "   INPUT TASK ID:",
+        taskId
+      );
+
+      console.log(
+        "   TASK ID MATCH:",
+        String(log.taskId || "").trim() ===
+          String(taskId || "").trim()
+      );
+
+      console.log(
+        "   LOG USER ID:",
+        log.userID
+      );
+
+      console.log(
+        "   INPUT USER ID:",
+        userID
+      );
+
+      console.log(
+        "   USER ID MATCH:",
+        String(log.userID || "").trim() ===
+          String(userID || "").trim()
+      );
+
+      console.log(
+        "   RAW LOG DATE:",
+        log.taskDate
+      );
+
+      console.log(
+        "   NORMALIZED LOG DATE:",
+        logTaskDate
+      );
+
+      console.log(
+        "   CURRENT TASK DATE:",
+        taskDate
+      );
+
+      console.log(
+        "   DATE MATCH:",
+        logTaskDate === taskDate
+      );
+
+      console.log(
+        "   LOG STATUS:",
+        log.status
+      );
+
+      console.log(
+        "   NORMALIZED STATUS:",
+        logStatus
+      );
+
+      console.log(
+        "   STATUS MATCH:",
+        logStatus === "COMPLETED"
+      );
+    });
+
+    // =========================================================
+    // 8. DUPLICATE CHECK
+    // =========================================================
+
+ const alreadyCompleted = allLogs.some(
+  (log) =>
+    log.taskId === taskId &&
+    log.userID === userID &&
+    normalizeTaskDate(log.taskDate) === taskDate &&
+    String(log.status).trim().toUpperCase() === "COMPLETED"
+);
+
+    console.log(
+      "\n🚨 ALREADY COMPLETED RESULT:",
+      alreadyCompleted
+    );
+
+    if (alreadyCompleted) {
+      console.log(
+        "🛑 DUPLICATE COMPLETION BLOCKED"
+      );
+
+      throw new Error(
+        "This task is already completed for today"
+      );
+    }
+
+    // =========================================================
+    // 9. GENERATE LOG ID
+    // =========================================================
+
+    const logNumbers = allLogs
+      .map((log) => {
+        const id = log.logId;
+
+        if (!id) return 0;
+
+        const match = String(id).match(/LOG(\d+)/);
+
+        return match ? Number(match[1]) : 0;
+      })
+      .filter(Boolean);
+
+    const nextNumber =
+      logNumbers.length > 0
+        ? Math.max(...logNumbers) + 1
+        : 1;
+
+    const logId = `LOG${String(nextNumber).padStart(
+      4,
+      "0"
+    )}`;
+
+    console.log("🆕 NEW LOG ID:", logId);
+
+    // =========================================================
+    // 10. CREATE LOG ROW
+    // =========================================================
+
+    const newLogRow = [
+      logId,
+      task.taskId,
+      userID,
+      taskDate,
+      task.taskType,
+      task.assignedTo,
+      "COMPLETED",
+      now,
+    ];
+
+    console.log(
+      "📝 NEW LOG ROW:",
+      newLogRow
+    );
+
+    // =========================================================
+    // 11. SAVE LOG
+    // =========================================================
+
+    console.log("💾 SAVING LOG...");
+
+    await appendDailyTaskLog(newLogRow);
+
+    console.log("✅ LOG SAVED SUCCESSFULLY");
+
+    // =========================================================
+    // 12. RETURN RESULT
+    // =========================================================
+
+    const result = {
+      logId,
+      taskId: task.taskId,
+      userID,
+      taskDate,
+      taskType: task.taskType,
+      assignedTo: task.assignedTo,
+      status: "COMPLETED",
+      completedAt: now,
+    };
+
+    console.log("📤 FINAL RESULT:", result);
+
+    console.log("========================================");
+    console.log("✅ COMPLETE DAILY TASK END");
+    console.log("========================================\n");
+
+    return result;
+
+  } catch (error) {
+    console.error(
+      "\n❌ completeDailyTaskService error:",
+      error
+    );
+
+    console.error(
+      "❌ ERROR MESSAGE:",
+      error.message
+    );
+
     throw error;
   }
 };
