@@ -4,6 +4,7 @@ import {
   updateDailyTask,
   completeDailyTaskService,
 } from "../services/dailyTask.service.js";
+import { getDailyTaskLogs } from "../utils/dailyTask.utils.js";
 
 // =========================================================
 // GET ALL DAILY TASKS
@@ -118,8 +119,7 @@ export const getDailyTaskForEmployee = async (req, res) => {
   }
 };
 
-
-// EMPLOYEE COMPLETE DAILY TASKS 
+// EMPLOYEE COMPLETE DAILY TASKS
 export const completeDailyTask = async (req, res) => {
   try {
     const { taskId, userID } = req.body;
@@ -153,16 +153,120 @@ export const completeDailyTask = async (req, res) => {
       message: "Daily task completed successfully",
       data: result,
     });
-
   } catch (error) {
-    console.error(
-      "❌ completeDailyTask controller error:",
-      error
-    );
+    console.error("❌ completeDailyTask controller error:", error);
 
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+
+// get weekly performance of employees
+export const getWeeklyPerformanceOfEmployee = async (req, res) => {
+  try {
+    const { userID, startDate, endDate } = req.query;
+
+    // =========================================================
+    // 1. VALIDATION
+    // =========================================================
+
+    if (!userID || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "userID, startDate and endDate are required",
+      });
+    }
+
+    // =========================================================
+    // 2. GET DAILY TASK LOGS
+    // =========================================================
+
+    const dailyTaskLogs = await getDailyTaskLogs();
+
+    if (!dailyTaskLogs || dailyTaskLogs.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          userID,
+          startDate,
+          endDate,
+          summary: {
+            assigned: 0,
+            completed: 0,
+            pending: 0,
+            onTime: 0,
+            late: 0,
+            score: 0,
+          },
+          logs: [],
+        },
+      });
+    }
+
+    // =========================================================
+    // 3. FILTER EMPLOYEE + DATE RANGE
+    // =========================================================
+
+    const employeeLogs = dailyTaskLogs.filter((log) => {
+      const logUserID = String(log.userID || "").trim();
+
+      const logDate = String(log.taskDate || "").trim();
+
+      return (
+        logUserID === String(userID).trim() &&
+        logDate >= startDate &&
+        logDate <= endDate
+      );
+    });
+
+    // =========================================================
+    // 4. BASIC PERFORMANCE COUNTS
+    // =========================================================
+
+    const assigned = employeeLogs.length;
+
+    const completedLogs = employeeLogs.filter(
+      (log) =>
+        String(log.status || "").toUpperCase() === "COMPLETED"
+    );
+
+    const completed = completedLogs.length;
+
+    const pending = assigned - completed;
+
+    // =========================================================
+    // 5. RESPONSE
+    // =========================================================
+
+    return res.status(200).json({
+      success: true,
+
+      data: {
+        userID,
+        startDate,
+        endDate,
+
+        summary: {
+          assigned,
+          completed,
+          pending,
+          onTime: 0,
+          late: 0,
+          score: 0,
+        },
+
+        logs: employeeLogs,
+      },
+    });
+  } catch (error) {
+    console.error("getWeeklyPerformanceOfEmployee error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
     });
   }
 };

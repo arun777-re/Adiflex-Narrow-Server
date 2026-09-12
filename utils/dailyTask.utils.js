@@ -1,30 +1,26 @@
 import sheets from '../config/db.js'
 import { DAILY_TASK_LOG_COLUMNS } from '../constants/dailyTask.constant.js';
 import { SHEET_NAMES } from '../constants/sheetNames.js';
+import { getFromCache,setCache,clearCache } from '../services/product.cache.service.js';
 
 
 // =========================================================
 // DAILY TASKS - GET ALL
 // =========================================================
 
-const cache = new Map();
-
-const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
 
 const SPREADSHEET_ID = process.env.DAILY_TASK_SHEET_ID;
+    const cacheKey = "daily_tasks";
+
 
 export const getDailyTasks = async () => {
   try {
-    const cacheKey = "daily_tasks";
 
-    const cached = cache.get(cacheKey);
+    const cached = getFromCache(cacheKey);
 
-    if (
-      cached &&
-      Date.now() - cached.timestamp < CACHE_TTL
-    ) {
+    if (cached) {
       console.log("⚡ DAILY_TASKS CACHE HIT");
-      return cached.data;
+      return cached;
     }
 
     console.log("📊 DAILY_TASKS GOOGLE SHEET FETCH");
@@ -36,10 +32,7 @@ export const getDailyTasks = async () => {
 
     const data = response.data.values || [];
 
-    cache.set(cacheKey, {
-      data,
-      timestamp: Date.now(),
-    });
+    setCache(cacheKey, data);
 
     return data;
   } catch (error) {
@@ -53,15 +46,13 @@ export const getDailyTaskLogs = async () => {
   try {
     const cacheKey = "daily_tasks_logs";
 
-    const cached = cache.get(cacheKey);
+    const cached = getFromCache(cacheKey);
 
-    if (
-      cached &&
-      Date.now() - cached.timestamp < CACHE_TTL
-    ) {
+    if (cached) {
       console.log("⚡ DAILY_TASK_LOGS CACHE HIT");
-      return cached.data;
+      return cached;
     }
+
 
     console.log("📊 DAILY_TASK_LOGS GOOGLE SHEET FETCH");
 
@@ -72,11 +63,13 @@ export const getDailyTaskLogs = async () => {
 
     const rows = response.data.values || [];
 
-    // Header remove + empty rows remove
     const data = rows
       .slice(1)
       .filter((row) =>
-        row && row.some((cell) => String(cell || "").trim() !== "")
+        row &&
+        row.some(
+          (cell) => String(cell || "").trim() !== ""
+        )
       )
       .map((row) => ({
         logId: row[DAILY_TASK_LOG_COLUMNS.LOG_ID] || "",
@@ -89,10 +82,7 @@ export const getDailyTaskLogs = async () => {
         completedAt: row[DAILY_TASK_LOG_COLUMNS.COMPLETED_AT] || "",
       }));
 
-    cache.set(cacheKey, {
-      data,
-      timestamp: Date.now(),
-    });
+    setCache(cacheKey, data);
 
     return data;
   } catch (error) {
@@ -117,7 +107,8 @@ export const appendDailyTask = async (row) => {
         values: [row],
       },
     });
-    cache.clear();
+
+    clearCache("daily_tasks");
   } catch (error) {
     console.error("appendDailyTask error:", error);
     throw error;

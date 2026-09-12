@@ -1,6 +1,6 @@
 const cache = new Map();
 
-const DEFAULT_CACHE_TTL = 12 * 60 * 60 * 1000;
+const DEFAULT_CACHE_TTL = 12 * 60 * 60 * 1000; 
 
 export const setCache = (
   key,

@@ -6,6 +6,7 @@ import {
   updateTask,
   getDailyTaskForEmployee,
   completeDailyTask,
+  getWeeklyPerformanceOfEmployee,
 } from "../controller/dailyTask.controller.js";
 
 const router = express.Router();
@@ -25,7 +26,9 @@ router.patch("/update/:taskId", updateTask);
 
 // employe routes 
 router.get('/employee-gettasks',getDailyTaskForEmployee);
-router.post('/complete-task',completeDailyTask)
+router.post('/complete-task',completeDailyTask);
+
+router.get('/get-score',getWeeklyPerformanceOfEmployee)
 
 
 export default router;

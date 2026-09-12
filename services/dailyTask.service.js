@@ -12,8 +12,9 @@ import {
   DAILY_TASK_COLUMN_LETTERS,
 } from "../constants/dailyTask.constant.js";
 import { getCurrentDateTime } from "../config/db.js";
+import { getFromCache,setCache,clearCache } from "./product.cache.service.js";
 
-
+const completionLocks = new Map();
 
 
 // =========================================================
@@ -233,325 +234,201 @@ export const updateDailyTask = async (taskId, updates) => {
 };
 
 
+// =========================================================
 // COMPLETE DAILY TASK SERVICE FOR EMPLOYEES
+// =========================================================
 export const completeDailyTaskService = async ({
   taskId,
   userID,
 }) => {
+  const now = getCurrentDateTime();
+  const taskDate = normalizeTaskDate(now);
+
+  const cleanTaskId = String(taskId || "").trim();
+  const cleanUserID = String(userID || "").trim();
+
+  if (!cleanTaskId || !cleanUserID) {
+    throw new Error("taskId and userID are required");
+  }
+
+  // =========================================================
+  // UNIQUE LOCK
+  // TASK + USER + DATE
+  // =========================================================
+
+  const lockKey = `${cleanTaskId}_${cleanUserID}_${taskDate}`;
+
+  // =========================================================
+  // 1. BLOCK SIMULTANEOUS REQUESTS
+  // =========================================================
+
+  if (completionLocks.has(lockKey)) {
+    throw new Error(
+      "This task is already being completed. Please wait."
+    );
+  }
+
+  completionLocks.set(lockKey, true);
+
   try {
-    console.log("\n========================================");
-    console.log("🚀 COMPLETE DAILY TASK START");
-    console.log("========================================");
-
-    console.log("📥 INPUT taskId:", taskId);
-    console.log("📥 INPUT userID:", userID);
-
-    // =========================================================
-    // 1. GET ALL TASKS
-    // =========================================================
+    // =======================================================
+    // 2. GET TASK
+    // =======================================================
 
     const allTasks = await getAllDailyTasks();
 
-    console.log("📋 ALL TASKS LENGTH:", allTasks?.length);
-    console.log("📋 ALL TASKS:", allTasks);
-
     const task = allTasks.find(
-      (task) =>
-        String(task.taskId || "").trim() ===
-        String(taskId || "").trim()
+      (item) =>
+        String(item.taskId || "").trim() === cleanTaskId
     );
 
-    console.log("🎯 FOUND TASK:", task);
-
     if (!task) {
-      console.log("❌ TASK NOT FOUND");
       throw new Error("Daily task not found");
     }
 
-    // =========================================================
-    // 2. CHECK TASK ASSIGNMENT
-    // =========================================================
-
-    console.log("👤 TASK ASSIGNED TO:", task.assignedTo);
-    console.log("👤 CURRENT USER ID:", userID);
-
-    console.log(
-      "🔍 ASSIGNMENT MATCH:",
-      String(task.assignedTo || "").trim() ===
-        String(userID || "").trim()
-    );
+    // =======================================================
+    // 3. VERIFY ASSIGNMENT
+    // =======================================================
 
     if (
       String(task.assignedTo || "").trim() !==
-      String(userID || "").trim()
+      cleanUserID
     ) {
       throw new Error(
         "This task is not assigned to this employee"
       );
     }
 
-    // =========================================================
-    // 3. CHECK ACTIVE TASK
-    // =========================================================
-
-    console.log("🟢 TASK ACTIVE VALUE:", task.active);
-    console.log(
-      "🟢 TASK ACTIVE TYPE:",
-      typeof task.active
-    );
+    // =======================================================
+    // 4. VERIFY ACTIVE
+    // =======================================================
 
     if (task.active !== true) {
-      console.log("❌ TASK IS NOT ACTIVE");
       throw new Error("This task is inactive");
     }
 
-    // =========================================================
-    // 4. TODAY'S DATE
-    // =========================================================
+    // =======================================================
+    // 5. IMPORTANT:
+    // FORCE FRESH LOG DATA
+    //
+    // Do NOT allow an old cached log list here.
+    // Otherwise second click can create duplicate logs.
+    // =======================================================
 
-    const now = getCurrentDateTime();
-
-const taskDate = normalizeTaskDate(now);
-
-    console.log("🕐 CURRENT DATETIME:", now);
-    console.log("📅 TASK DATE:", taskDate);
-
-    // =========================================================
-    // 5. GET EXISTING LOGS
-    // =========================================================
+    clearCache("daily_tasks_logs");
 
     const allLogs = await getDailyTaskLogs();
 
-    console.log("📚 ALL LOGS LENGTH:", allLogs?.length);
-    console.log("📚 ALL LOGS:", allLogs);
+    // =======================================================
+    // 6. CHECK ALREADY COMPLETED TODAY
+    // =======================================================
 
-    // =========================================================
-    // 6. FILTER RELEVANT LOGS
-    // =========================================================
-
-    const relevantLogs = allLogs.filter((log) => {
+    const alreadyCompleted = allLogs.some((log) => {
       const logTaskId = String(log.taskId || "").trim();
-      const logUserID = String(log.userID || "").trim();
 
-      return (
-        logTaskId === String(taskId || "").trim() &&
-        logUserID === String(userID || "").trim()
-      );
-    });
+      const logUserId = String(log.userID || "").trim();
 
-    console.log(
-      "🔎 RELEVANT LOGS FOR THIS TASK + USER:",
-      relevantLogs
-    );
+      const logDate = normalizeTaskDate(log.taskDate);
 
-    // =========================================================
-    // 7. CHECK EACH LOG
-    // =========================================================
-
-    relevantLogs.forEach((log, index) => {
-      const logTaskDate = String(
-        log.taskDate || ""
-      )
-        .trim()
-        .split(" ")[0];
-
-      const logStatus = String(
-        log.status || ""
-      )
+      const logStatus = String(log.status || "")
         .trim()
         .toUpperCase();
 
-      console.log(`\n🔍 LOG CHECK #${index + 1}`);
-
-      console.log("   LOG ID:", log.logId);
-
-      console.log(
-        "   LOG TASK ID:",
-        log.taskId
-      );
-
-      console.log(
-        "   INPUT TASK ID:",
-        taskId
-      );
-
-      console.log(
-        "   TASK ID MATCH:",
-        String(log.taskId || "").trim() ===
-          String(taskId || "").trim()
-      );
-
-      console.log(
-        "   LOG USER ID:",
-        log.userID
-      );
-
-      console.log(
-        "   INPUT USER ID:",
-        userID
-      );
-
-      console.log(
-        "   USER ID MATCH:",
-        String(log.userID || "").trim() ===
-          String(userID || "").trim()
-      );
-
-      console.log(
-        "   RAW LOG DATE:",
-        log.taskDate
-      );
-
-      console.log(
-        "   NORMALIZED LOG DATE:",
-        logTaskDate
-      );
-
-      console.log(
-        "   CURRENT TASK DATE:",
-        taskDate
-      );
-
-      console.log(
-        "   DATE MATCH:",
-        logTaskDate === taskDate
-      );
-
-      console.log(
-        "   LOG STATUS:",
-        log.status
-      );
-
-      console.log(
-        "   NORMALIZED STATUS:",
-        logStatus
-      );
-
-      console.log(
-        "   STATUS MATCH:",
+      return (
+        logTaskId === cleanTaskId &&
+        logUserId === cleanUserID &&
+        logDate === taskDate &&
         logStatus === "COMPLETED"
       );
     });
 
-    // =========================================================
-    // 8. DUPLICATE CHECK
-    // =========================================================
-
- const alreadyCompleted = allLogs.some(
-  (log) =>
-    log.taskId === taskId &&
-    log.userID === userID &&
-    normalizeTaskDate(log.taskDate) === taskDate &&
-    String(log.status).trim().toUpperCase() === "COMPLETED"
-);
-
-    console.log(
-      "\n🚨 ALREADY COMPLETED RESULT:",
-      alreadyCompleted
-    );
+    // =======================================================
+    // 7. STOP DUPLICATE COMPLETION
+    // =======================================================
 
     if (alreadyCompleted) {
-      console.log(
-        "🛑 DUPLICATE COMPLETION BLOCKED"
-      );
-
       throw new Error(
         "This task is already completed for today"
       );
     }
 
-    // =========================================================
-    // 9. GENERATE LOG ID
-    // =========================================================
+    // =======================================================
+    // 8. GENERATE NEXT LOG ID
+    // =======================================================
 
     const logNumbers = allLogs
       .map((log) => {
-        const id = log.logId;
-
-        if (!id) return 0;
-
-        const match = String(id).match(/LOG(\d+)/);
+        const match = String(log.logId || "").match(
+          /^LOG(\d+)$/
+        );
 
         return match ? Number(match[1]) : 0;
       })
-      .filter(Boolean);
+      .filter((number) => number > 0);
 
     const nextNumber =
       logNumbers.length > 0
         ? Math.max(...logNumbers) + 1
         : 1;
 
-    const logId = `LOG${String(nextNumber).padStart(
-      4,
-      "0"
-    )}`;
+    const logId = `LOG${String(nextNumber).padStart(4, "0")}`;
 
-    console.log("🆕 NEW LOG ID:", logId);
-
-    // =========================================================
-    // 10. CREATE LOG ROW
-    // =========================================================
+    // =======================================================
+    // 9. CREATE LOG ROW
+    // =======================================================
 
     const newLogRow = [
       logId,
       task.taskId,
-      userID,
+      cleanUserID,
       taskDate,
-      task.taskType,
+      task.taskType || "",
       task.assignedTo,
       "COMPLETED",
       now,
     ];
 
-    console.log(
-      "📝 NEW LOG ROW:",
-      newLogRow
-    );
-
-    // =========================================================
-    // 11. SAVE LOG
-    // =========================================================
-
-    console.log("💾 SAVING LOG...");
+    // =======================================================
+    // 10. SAVE TO GOOGLE SHEET
+    // =======================================================
 
     await appendDailyTaskLog(newLogRow);
 
-    console.log("✅ LOG SAVED SUCCESSFULLY");
+    // =======================================================
+    // 11. CLEAR CACHE AGAIN
+    // =======================================================
 
-    // =========================================================
-    // 12. RETURN RESULT
-    // =========================================================
+    clearCache("daily_tasks_logs");
 
-    const result = {
+    // =======================================================
+    // 12. RETURN SUCCESS
+    // =======================================================
+
+    return {
       logId,
       taskId: task.taskId,
-      userID,
+      userID: cleanUserID,
       taskDate,
-      taskType: task.taskType,
+      taskType: task.taskType || "",
       assignedTo: task.assignedTo,
       status: "COMPLETED",
       completedAt: now,
     };
 
-    console.log("📤 FINAL RESULT:", result);
-
-    console.log("========================================");
-    console.log("✅ COMPLETE DAILY TASK END");
-    console.log("========================================\n");
-
-    return result;
-
   } catch (error) {
     console.error(
-      "\n❌ completeDailyTaskService error:",
+      "❌ completeDailyTaskService error:",
       error
     );
 
-    console.error(
-      "❌ ERROR MESSAGE:",
-      error.message
-    );
-
     throw error;
+
+  } finally {
+    // =======================================================
+    // 13. ALWAYS RELEASE LOCK
+    // =======================================================
+
+    completionLocks.delete(lockKey);
   }
 };
+
