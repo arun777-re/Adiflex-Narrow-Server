@@ -1,17 +1,19 @@
 import sheets, { auth } from "../config/db.js";
 import { PRODUCT_COLUMNS } from "../constants/productColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
-import {getFromCache,setCache,clearCache} from '../services/product.cache.service.js'
+import {
+  getFromCache,
+  setCache,
+  clearCache,
+} from "../services/product.cache.service.js";
 
 const spreadsheetId = process.env.PRODUCT_MASTER_SHEET_ID;
-    const CACHE_KEY = "products";
-
+const CACHE_KEY = "products";
 
 // get all products service
 export const getProductsService = async () => {
   try {
     console.time("🔥 TOTAL getProductsService");
-
 
     // ==========================================
     // 1. CHECK CACHE
@@ -61,11 +63,7 @@ export const getProductsService = async () => {
     if (rows.length <= 1) {
       console.log("⚠️ PRODUCT SHEET EMPTY");
 
-      setCache(
-        CACHE_KEY,
-        [],
-        12 * 60 * 60 * 1000
-      );
+      setCache(CACHE_KEY, [], 12 * 60 * 60 * 1000);
 
       console.timeEnd("🔥 TOTAL getProductsService");
 
@@ -101,11 +99,7 @@ export const getProductsService = async () => {
 
     console.time("💾 Set product cache");
 
-    setCache(
-      CACHE_KEY,
-      products,
-      12 * 60 * 60 * 1000
-    );
+    setCache(CACHE_KEY, products, 30 * 60 * 1000);
 
     console.timeEnd("💾 Set product cache");
 
@@ -119,14 +113,11 @@ export const getProductsService = async () => {
     console.timeEnd("🔥 TOTAL getProductsService");
 
     return products;
-
   } catch (error) {
     console.error("❌ getProductsService error:", error);
     throw error;
   }
 };
-
-
 
 // generate sku code for products acc to division
 export const generateSKU = async (division) => {
@@ -136,26 +127,18 @@ export const generateSKU = async (division) => {
 
   const skuList = rows
     .map((row) => row.sku)
-    .filter(
-      (sku) => sku && sku.startsWith(prefix)
-    );
+    .filter((sku) => sku && sku.startsWith(prefix));
 
   if (skuList.length === 0) {
     return `${prefix}0001`;
   }
 
   const lastNumber = Math.max(
-    ...skuList.map((sku) =>
-      Number(sku.replace(prefix, ""))
-    )
+    ...skuList.map((sku) => Number(sku.replace(prefix, ""))),
   );
 
-  return `${prefix}${String(lastNumber + 1).padStart(
-    4,
-    "0"
-  )}`;
+  return `${prefix}${String(lastNumber + 1).padStart(4, "0")}`;
 };
-
 
 // create product
 export const createProductService = async ({
@@ -169,14 +152,14 @@ export const createProductService = async ({
   meterPerKG,
   createdBy,
 }) => {
-console.log("🔥 BEFORE PRODUCT AUTH");
+  console.log("🔥 BEFORE PRODUCT AUTH");
 
-const authClient = await auth.getClient();
+  const authClient = await auth.getClient();
 
-console.log("🔥 PRODUCT AUTH SUCCESS");
+  console.log("🔥 PRODUCT AUTH SUCCESS");
 
   const rows = await getProductsService();
-// duplicate check 
+  // duplicate check
 
   const isExists = rows
     .slice(1)
@@ -188,22 +171,19 @@ console.log("🔥 PRODUCT AUTH SUCCESS");
         (row[PRODUCT_COLUMNS.COLOR] || "").trim().toLowerCase() ===
           (color || "").trim().toLowerCase() &&
         (row[PRODUCT_COLUMNS.SIZE] || "").trim().toLowerCase() ===
-          (size || "").trim().toLowerCase() && 
-          (row[PRODUCT_COLUMNS.RATE] || "").trim().toLowerCase() ===
-          (rate || "").trim().toLowerCase()
-
+          (size || "").trim().toLowerCase() &&
+        (row[PRODUCT_COLUMNS.RATE] || "").trim().toLowerCase() ===
+          (rate || "").trim().toLowerCase(),
     );
 
   if (isExists) {
-    throw new Error(
-      "Product already exists."
-    );
+    throw new Error("Product already exists.");
   }
 
-// generate sku
+  // generate sku
   const sku = await generateSKU(division);
 
-// append product
+  // append product
   const values = [
     [
       sku,
@@ -234,7 +214,7 @@ console.log("🔥 PRODUCT AUTH SUCCESS");
     },
   });
 
-  clearCache();
+  clearCache(CACHE_KEY);
 
   return {
     sku,
@@ -248,24 +228,18 @@ console.log("🔥 PRODUCT AUTH SUCCESS");
   };
 };
 
-
 // get product by sku
 
-export const getProductBySkuService = async (
-  sku
-) => {
+export const getProductBySkuService = async (sku) => {
   const rows = await getProductsService();
 
-  const row = rows.find(
-      
-    (item) => item.sku === sku
-  );
+  const row = rows.find((item) => item.sku === sku);
 
   if (!row) {
     throw new Error("Product not found");
   }
 
-  return row
+  return row;
 };
 
 // update product service
@@ -278,15 +252,13 @@ export const updateProductService = async ({
   size,
   meterPerKg,
   meterPerRoll,
-  basicUnit="METER",
+  basicUnit = "METER",
   updatedBy,
 }) => {
   const authClient = await auth.getClient();
 
   const rows = await getProductsService();
-const rowIndex = rows.findIndex(
-  (row) => row.sku === sku
-);
+  const rowIndex = rows.findIndex((row) => row.sku === sku);
 
   if (rowIndex === -1) {
     throw new Error("Product not found");
@@ -294,35 +266,36 @@ const rowIndex = rows.findIndex(
 
   // Skip Header Row
   const actualRow = rowIndex + 2;
-console.log("actual row of data",actualRow)
+  console.log("actual row of data", actualRow);
   await sheets.spreadsheets.values.update({
     auth: authClient,
     spreadsheetId,
     range: `${SHEET_NAMES.PRODUCT_SHEET}!B${actualRow}:N${actualRow}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-   values: [[
-        productName,                    // B Product
-        division,                       // C Division
-        size,                           // D Size
-        color,                          // E Color
-        rate,                           // F Rate
-        basicUnit,                      // G BasicUnit
-        meterPerRoll,                   // H METER/ROLL
-        meterPerKg,                     // I METER/KG
-        rows[rowIndex].status,          // J STATUS
-        rows[rowIndex].createdBy,       // K Created By
-        rows[rowIndex].createdAt,       // L Created At
-        updatedBy,                      // M Updated By
-        new Date().toISOString(),       // N Updated At
-      ]],
+      values: [
+        [
+          productName, // B Product
+          division, // C Division
+          size, // D Size
+          color, // E Color
+          rate, // F Rate
+          basicUnit, // G BasicUnit
+          meterPerRoll, // H METER/ROLL
+          meterPerKg, // I METER/KG
+          rows[rowIndex].status, // J STATUS
+          rows[rowIndex].createdBy, // K Created By
+          rows[rowIndex].createdAt, // L Created At
+          updatedBy, // M Updated By
+          new Date().toISOString(), // N Updated At
+        ],
+      ],
     },
   });
 
-  clearCache()
+  clearCache(CACHE_KEY);
   return await getProductBySkuService(sku);
 };
-
 
 // UPDATE PRODUCT STATUS
 export const updateProductStatusService = async ({
@@ -334,10 +307,7 @@ export const updateProductStatusService = async ({
 
   const rows = await getProductsService();
 
-  const rowIndex = rows.findIndex(
-    (row) =>
-      row[PRODUCT_COLUMNS.SKU] === sku
-  );
+  const rowIndex = rows.findIndex((row) => row[PRODUCT_COLUMNS.SKU] === sku);
 
   if (rowIndex === -1) {
     throw new Error("Product not found");
@@ -351,13 +321,15 @@ export const updateProductStatusService = async ({
     range: `${SHEET_NAMES.PRODUCT_MASTER}!H${actualRow}:L${actualRow}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[
-        status,
-        rows[rowIndex][PRODUCT_COLUMNS.CREATED_BY],
-        rows[rowIndex][PRODUCT_COLUMNS.CREATED_AT],
-        updatedBy,
-        new Date().toISOString(),
-      ]],
+      values: [
+        [
+          status,
+          rows[rowIndex][PRODUCT_COLUMNS.CREATED_BY],
+          rows[rowIndex][PRODUCT_COLUMNS.CREATED_AT],
+          updatedBy,
+          new Date().toISOString(),
+        ],
+      ],
     },
   });
 
