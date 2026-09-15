@@ -1,5 +1,5 @@
 import sheets, { auth } from "../config/db.js";
-import { SALES_COLUMNS } from "../constants/salesColumns.js";
+import { SALES_COLUMN_LETTERS, SALES_COLUMNS } from "../constants/salesColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { appendDispatch } from "../services/dispatchSheet.js";
 import { findFGStockBySKU } from "../services/fgSheets.js";
@@ -9,6 +9,7 @@ import { getLastSalesOrderNumber, getSalesOrders } from "../services/salesOrderS
 // ==========================================
 // REQUEST LEVEL CACHE
 // ==========================================
+const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
 
 const productCache = new Map();
 export const fgCache = new Map();
@@ -63,6 +64,72 @@ export const addDirectDispatchOrder = async ({
   return true;
 };
 
+export const mapSalesOrderRow = (row = []) => {
+  return {
+    soNo: row[SALES_COLUMNS.SO_NO] ?? "",
+    date: row[SALES_COLUMNS.DATE] ?? "",
+
+    skucode: row[SALES_COLUMNS.SKU_CODE] ?? "",
+    customer: row[SALES_COLUMNS.CUSTOMER] ?? "",
+    product: row[SALES_COLUMNS.PRODUCT_NAME] ?? "",
+
+    ordertype: row[SALES_COLUMNS.ORDER_TYPE] ?? "",
+    route: row[SALES_COLUMNS.ROUTE] ?? "",
+    partyPO: row[SALES_COLUMNS.PARTY_PO] ?? "",
+
+    division: row[SALES_COLUMNS.DIVISION] ?? "",
+
+    soQty: Number(row[SALES_COLUMNS.SO_QTY]) || 0,
+    unit: row[SALES_COLUMNS.UNIT] ?? "",
+
+    soQtyInMeter:
+      Number(row[SALES_COLUMNS.SO_QTY_IN_METER]) || 0,
+
+    rate:
+      Number(row[SALES_COLUMNS.STANDARD_RATE]) || 0,
+
+    rateadjustment:
+      Number(row[SALES_COLUMNS.RATE_ADJUSTMENT]) || 0,
+
+    finalrate:
+      Number(row[SALES_COLUMNS.FINAL_RATE]) || 0,
+
+    openingFGQty:
+      Number(row[SALES_COLUMNS.OPENING_FG_QTY]) || 0,
+
+    productionQty:
+      Number(row[SALES_COLUMNS.PRODUCTION_QTY]) || 0,
+
+    jobWork:
+      row[SALES_COLUMNS.JOB_WORK] === true ||
+      String(row[SALES_COLUMNS.JOB_WORK] ?? "").toLowerCase() === "true" ||
+      String(row[SALES_COLUMNS.JOB_WORK] ?? "").toLowerCase() === "yes",
+
+    freight:
+      Number(row[SALES_COLUMNS.FREIGHT]) || 0,
+
+    manufacturedQty:
+      Number(row[SALES_COLUMNS.MANUFACTURED_QTY]) || 0,
+
+    dispatchedQty:
+      Number(row[SALES_COLUMNS.DISPATCHED_QTY]) || 0,
+
+    orderReceivedBy:
+      row[SALES_COLUMNS.ORDER_RECEIVED_BY] ?? "",
+
+    overallStatus:
+      row[SALES_COLUMNS.OVERALL_STATUS] ?? "",
+
+    billinglocation:
+      row[SALES_COLUMNS.BILLING_LOCATION] ?? "",
+
+    shippinglocation:
+      row[SALES_COLUMNS.SHIPPING_LOCATION] ?? "",
+
+    orderAmount:
+      Number(row[SALES_COLUMNS.ORDER_AMOUNT]) || 0,
+  };
+};
 export const getProductMasterCached = async (sku) => {
   if (!sku) {
     throw new Error("SKU is required");
@@ -208,7 +275,7 @@ export const updateSalesOrderCellsBatch = async ({
   if (!updates?.length) return;
 
   const data = updates.map(([columnLetter, value]) => ({
-    range: `${SHEET_NAMES.SALES_ORDERS}!${columnLetter}${rowNumber}`,
+    range: `${SHEET_NAMES.SALES_MASTER}!${columnLetter}${rowNumber}`,
     values: [[value]],
   }));
 
@@ -222,109 +289,141 @@ export const updateSalesOrderCellsBatch = async ({
   });
 };
 
-export const updateSalesOrderBySoNo = async (soNo, updates) => {
+// =========================================================
+// SALES ORDER UPDATE FIELD MAP
+// column letter -> update object field
+// =========================================================
+
+const SALES_UPDATE_FIELDS = {
+  [SALES_COLUMN_LETTERS.SO_QTY]: "soQty",
+  [SALES_COLUMN_LETTERS.SO_QTY_IN_METER]: "soQtyInMeter",
+  [SALES_COLUMN_LETTERS.STANDARD_RATE]: "rate",
+  [SALES_COLUMN_LETTERS.RATE_ADJUSTMENT]: "rateadjustment",
+  [SALES_COLUMN_LETTERS.FINAL_RATE]: "finalrate",
+  [SALES_COLUMN_LETTERS.UNIT]: "unit",
+  [SALES_COLUMN_LETTERS.JOB_WORK]: "jobWork",
+  [SALES_COLUMN_LETTERS.SHIPPING_LOCATION]: "shippinglocation",
+  [SALES_COLUMN_LETTERS.BILLING_LOCATION]: "billinglocation",
+  [SALES_COLUMN_LETTERS.ROUTE]: "route",
+  [SALES_COLUMN_LETTERS.SKU_CODE]: "skucode",
+};
+
+
+// =========================================================
+// UPDATE SALES ORDER BY SO NO
+// =========================================================
+
+export const updateSalesOrderBySoNo = async (
+  soNo,
+  updates = {}
+) => {
   try {
-    // =========================================================
-    // 1. GET SALES ORDERS
-    // =========================================================
+    // -----------------------------------------------------
+    // 1. VALIDATE SO NUMBER
+    // -----------------------------------------------------
 
-    const rows = await getSalesOrders();
+    const targetSoNo = String(soNo ?? "").trim();
 
-    if (!rows || rows.length <= 1) {
+    if (!targetSoNo) {
       return null;
     }
 
-    // =========================================================
-    // 2. FIND SALES ORDER
-    // Header = row 0
-    // =========================================================
+
+    // -----------------------------------------------------
+    // 2. GET SALES ORDERS
+    // -----------------------------------------------------
+
+    const rows = await getSalesOrders();
+
+    if (!rows?.length || rows.length <= 1) {
+      return null;
+    }
+
+
+    // -----------------------------------------------------
+    // 3. FIND SALES ORDER
+    // -----------------------------------------------------
 
     const rowIndex = rows.findIndex(
       (row, index) =>
         index > 0 &&
-        String(row[SALES_COLUMNS.SO_NO] ?? "").trim() ===
-          String(soNo).trim(),
+        String(row?.[SALES_COLUMNS.SO_NO] ?? "").trim() ===
+          targetSoNo
     );
 
     if (rowIndex === -1) {
       return null;
     }
 
-    // Array index -> Google Sheet row
+
+    // Google Sheet row number
+    // Array index 0 = header
     const sheetRowNumber = rowIndex + 1;
 
-    // =========================================================
-    // 3. PREPARE UPDATE MAP
-    // =========================================================
 
-    const updateMap = {
-      [SALES_COLUMN_LETTERS.SO_QTY]: updates.soQty,
-      [SALES_COLUMN_LETTERS.SO_QTY_IN_METER]: updates.soQtyInMeter,
+    // -----------------------------------------------------
+    // 4. BUILD UPDATE ARRAY
+    // -----------------------------------------------------
 
-      [SALES_COLUMN_LETTERS.STANDARD_RATE]: updates.rate,
-      [SALES_COLUMN_LETTERS.RATE_ADJUSTMENT]: updates.rateadjustment,
-      [SALES_COLUMN_LETTERS.FINAL_RATE]: updates.finalrate,
+    const updatesToApply = Object.entries(SALES_UPDATE_FIELDS)
+      .map(([columnLetter, field]) => [
+        columnLetter,
+        updates[field],
+      ])
+      .filter(([, value]) => value !== undefined);
 
-      [SALES_COLUMN_LETTERS.UNIT]: updates.unit,
-      [SALES_COLUMN_LETTERS.JOB_WORK]: updates.jobWork,
 
-      [SALES_COLUMN_LETTERS.SHIPPING_LOCATION]:
-        updates.shippinglocation,
-
-      [SALES_COLUMN_LETTERS.BILLING_LOCATION]:
-        updates.billinglocation,
-
-      [SALES_COLUMN_LETTERS.ROUTE]: updates.route,
-
-      [SALES_COLUMN_LETTERS.SKU_CODE]: updates.skucode,
-    };
-
-    // =========================================================
-    // 4. REMOVE UNDEFINED VALUES
-    // =========================================================
-
-    const updatesToApply = Object.entries(updateMap).filter(
-      ([, value]) => value !== undefined,
-    );
-
-    if (updatesToApply.length === 0) {
+    // Nothing to update
+    if (!updatesToApply.length) {
       return {
-        soNo,
+        soNo: targetSoNo,
         message: "No fields to update",
       };
     }
 
-    // =========================================================
-    // 5. BATCH UPDATE
-    // One Google Sheets API call
-    // =========================================================
+
+    // -----------------------------------------------------
+    // 5. ONE GOOGLE SHEET WRITE
+    // -----------------------------------------------------
 
     await updateSalesOrderCellsBatch({
       rowNumber: sheetRowNumber,
       updates: updatesToApply,
     });
 
-    // =========================================================
-    // 6. CREATE UPDATED ROW IN MEMORY
-    // No second GET request
-    // =========================================================
+
+    // -----------------------------------------------------
+    // 6. UPDATE LOCAL ROW
+    // -----------------------------------------------------
 
     const updatedRow = [...rows[rowIndex]];
 
     for (const [columnLetter, value] of updatesToApply) {
-      const columnIndex =
-        Object.entries(SALES_COLUMN_LETTERS).find(
-          ([, letter]) => letter === columnLetter,
-        )?.[0];
 
-      if (columnIndex) {
-        updatedRow[SALES_COLUMNS[columnIndex]] = value;
+      const columnKey = Object.keys(SALES_COLUMN_LETTERS).find(
+        (key) =>
+          SALES_COLUMN_LETTERS[key] === columnLetter
+      );
+
+      if (columnKey !== undefined) {
+        updatedRow[SALES_COLUMNS[columnKey]] = value;
       }
     }
 
+
+    // -----------------------------------------------------
+    // 7. RETURN UPDATED SALES ORDER
+    // -----------------------------------------------------
+
     return mapSalesOrderRow(updatedRow);
+
   } catch (error) {
-    console.error("updateSalesOrderBySoNo:", error);
+
+    console.error(
+      `[UPDATE SO] Failed for ${soNo}:`,
+      error
+    );
+
     throw error;
   }
 };

@@ -13,6 +13,7 @@ import {
   ALLOWED_DIVISIONS,
   updateOverallStatus,
   getLastSalesOrderNumber,
+  updateSalesOrderService,
 } from "../services/salesOrderSheet.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
 import { generateNextCycleId } from "../helpers/productionHelpers.js";
@@ -505,15 +506,42 @@ export const cancelSalesOrders = async (req, res) => {
 // controllers/salesOrderController.js
 
 export const updateSalesOrder = async (req, res) => {
+  const startTime = performance.now();
+
   try {
     const { soNo } = req.params;
 
+    console.log("\n========================================");
+    console.log("[SO UPDATE] REQUEST START");
+    console.log("[SO UPDATE] SO No:", soNo);
+    console.log("[SO UPDATE] Method:", req.method);
+    console.log("[SO UPDATE] URL:", req.originalUrl);
+    console.log("[SO UPDATE] Body:", req.body);
+
+    // =========================================================
+    // 1. VALIDATE SO NO
+    // =========================================================
+
+    const validationStart = performance.now();
+
     if (!soNo?.trim()) {
+      console.warn("[SO UPDATE] Validation failed: SO No missing");
+
       return res.status(400).json({
         success: false,
         message: "Sales Order Number is required",
       });
     }
+
+    console.log(
+      `[SO UPDATE] Validation completed in ${(
+        performance.now() - validationStart
+      ).toFixed(2)}ms`
+    );
+
+    // =========================================================
+    // 2. EXTRACT BODY
+    // =========================================================
 
     const {
       soQty,
@@ -527,6 +555,29 @@ export const updateSalesOrder = async (req, res) => {
       route,
       skucode,
     } = req.body;
+
+    console.log("[SO UPDATE] Parsed input:");
+    console.log({
+      soNo: soNo.trim(),
+      soQty,
+      rate,
+      rateadjustment,
+      finalrate,
+      unit,
+      jobWork,
+      shippinglocation,
+      billinglocation,
+      route,
+      skucode,
+    });
+
+    // =========================================================
+    // 3. CALL SERVICE
+    // =========================================================
+
+    console.log("[SO UPDATE] Calling updateSalesOrderService...");
+
+    const serviceStart = performance.now();
 
     const result = await updateSalesOrderService({
       soNo: soNo.trim(),
@@ -542,13 +593,43 @@ export const updateSalesOrder = async (req, res) => {
       skucode,
     });
 
+    const serviceTime = performance.now() - serviceStart;
+
+    console.log(
+      `[SO UPDATE] Service completed in ${serviceTime.toFixed(2)}ms`
+    );
+
+    // =========================================================
+    // 4. SUCCESS
+    // =========================================================
+
+    const totalTime = performance.now() - startTime;
+
+    console.log("[SO UPDATE] SUCCESS");
+    console.log("[SO UPDATE] Updated SO:", soNo);
+    console.log("[SO UPDATE] Result:", result);
+    console.log(
+      `[SO UPDATE] TOTAL REQUEST TIME: ${totalTime.toFixed(2)}ms`
+    );
+    console.log("========================================\n");
+
     return res.status(200).json({
       success: true,
       message: "Sales Order updated successfully",
       data: result,
     });
   } catch (error) {
-    console.error("updateSalesOrder:", error);
+    const totalTime = performance.now() - startTime;
+
+    console.error("\n========================================");
+    console.error("[SO UPDATE] FAILED");
+    console.error("[SO UPDATE] Error:", error);
+    console.error("[SO UPDATE] Message:", error.message);
+    console.error("[SO UPDATE] Status:", error.statusCode || 500);
+    console.error(
+      `[SO UPDATE] FAILED AFTER: ${totalTime.toFixed(2)}ms`
+    );
+    console.error("========================================\n");
 
     return res.status(error.statusCode || 500).json({
       success: false,

@@ -1,9 +1,10 @@
 import { auth, getDatabaseByDivision, updateCell } from "../config/db.js";
 import sheets from "../config/db.js";
 import { DISPATCH_COLUMNS } from "../constants/dispatch.js";
+import { PRODUCT_COLUMNS } from "../constants/productColumns.js";
 import { SALES_COLUMNS ,SALES_COLUMN_LETTERS} from "../constants/salesColumns.js";
 import { SHEET_NAMES,SHEETS_FROM_ENV_ID } from "../constants/sheetNames.js";
-import { convertToMeter, getProductMasterCached } from "../helpers/salesOrderHelpers.js";
+import { convertToMeter, getProductMasterCached, updateSalesOrderBySoNo } from "../helpers/salesOrderHelpers.js";
 
 const salesOrderSpreadsheetId = process.env.GOOGLE_SHEET_ID;
 
@@ -466,109 +467,270 @@ export const updateSalesOrderService = async ({
   route,
   skucode,
 }) => {
-  // =========================================================
-  // 1. VALIDATION
-  // =========================================================
+  const startTime = performance.now();
 
-  if (!soNo) {
-    const error = new Error("Sales Order Number is required");
-    error.statusCode = 400;
+  console.log("\n----------------------------------------");
+  console.log("[SO UPDATE SERVICE] START");
+  console.log("[SO UPDATE SERVICE] SO No:", soNo);
+
+  try {
+    // =========================================================
+    // 1. VALIDATION
+    // =========================================================
+
+    const validationStart = performance.now();
+
+    console.log("[SO UPDATE SERVICE] Validating input...");
+
+    if (!soNo) {
+      const error = new Error("Sales Order Number is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!skucode) {
+      const error = new Error("SKU Code is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (soQty == null || Number(soQty) < 0) {
+      const error = new Error("Valid SO Quantity is required");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    console.log(
+      `[SO UPDATE SERVICE] Validation: ${(
+        performance.now() - validationStart
+      ).toFixed(2)}ms`
+    );
+
+    // =========================================================
+    // 2. GET PRODUCT MASTER
+    // =========================================================
+
+    const productMasterStart = performance.now();
+
+    console.log(
+      `[SO UPDATE SERVICE] Getting Product Master for SKU: ${skucode}`
+    );
+
+    const productRow = await getProductMasterCached(skucode);
+
+    const productMasterTime = performance.now() - productMasterStart;
+
+    console.log(
+      `[SO UPDATE SERVICE] Product Master lookup: ${productMasterTime.toFixed(
+        2
+      )}ms`
+    );
+
+    if (!productRow) {
+      console.warn(
+        `[SO UPDATE SERVICE] Product not found for SKU: ${skucode}`
+      );
+
+      const error = new Error(
+        `Product not found for SKU: ${skucode}`
+      );
+
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // =========================================================
+    // 3. PRODUCT MASTER DATA
+    // =========================================================
+
+    const basicUnit = productRow[PRODUCT_COLUMNS.UNIT];
+
+    const meterPerRoll =
+      Number(productRow[PRODUCT_COLUMNS.METERPERROLL]) || 0;
+
+    const meterPerKg =
+      Number(productRow[PRODUCT_COLUMNS.METERPERKG]) || 0;
+
+    console.log("[SO UPDATE SERVICE] Product Master data:", {
+      basicUnit,
+      meterPerRoll,
+      meterPerKg,
+    });
+
+    // =========================================================
+    // 4. CONVERT SO QTY → METER
+    // =========================================================
+
+    const conversionStart = performance.now();
+
+    console.log("[SO UPDATE SERVICE] Converting quantity to meter...");
+
+    console.log("[SO UPDATE SERVICE] Conversion input:", {
+      qty: Number(soQty),
+      unit,
+      basicUnit,
+      meterPerRoll,
+      meterPerKg,
+    });
+
+    const meterQty = await convertToMeter({
+      qty: Number(soQty),
+      unit,
+      basicUnit,
+      meterPerRoll,
+      meterPerKg,
+    });
+
+    const conversionTime = performance.now() - conversionStart;
+
+    console.log(
+      `[SO UPDATE SERVICE] Convert To Meter: ${conversionTime.toFixed(
+        2
+      )}ms`
+    );
+
+    console.log(
+      "[SO UPDATE SERVICE] Calculated Meter Qty:",
+      meterQty
+    );
+
+    // =========================================================
+    // 5. FINAL RATE
+    // =========================================================
+
+    const rateStart = performance.now();
+
+    const calculatedFinalRate =
+      rate != null
+        ? Number(rate) + Number(rateadjustment || 0)
+        : Number(finalrate || 0);
+
+    console.log("[SO UPDATE SERVICE] Rate calculation:", {
+      rate,
+      rateadjustment,
+      oldFinalRate: finalrate,
+      calculatedFinalRate,
+    });
+
+    console.log(
+      `[SO UPDATE SERVICE] Rate calculation: ${(
+        performance.now() - rateStart
+      ).toFixed(2)}ms`
+    );
+
+    // =========================================================
+    // 6. BUILD UPDATE OBJECT
+    // =========================================================
+
+    const updatesStart = performance.now();
+
+    const updates = {
+      soQty: Number(soQty),
+      rate: Number(rate || 0),
+      rateadjustment: Number(rateadjustment || 0),
+      finalrate: calculatedFinalRate,
+      unit,
+      jobWork: Boolean(jobWork),
+      shippinglocation: shippinglocation?.trim() || "",
+      billinglocation: billinglocation?.trim() || "",
+      route: route?.trim() || "",
+      skucode,
+      soQtyInMeter: meterQty,
+    };
+
+    console.log("[SO UPDATE SERVICE] Update object:", updates);
+
+    console.log(
+      `[SO UPDATE SERVICE] Build update object: ${(
+        performance.now() - updatesStart
+      ).toFixed(2)}ms`
+    );
+
+    // =========================================================
+    // 7. UPDATE SALES ORDER IN SHEET
+    // =========================================================
+
+    const sheetUpdateStart = performance.now();
+
+    console.log(
+      `[SO UPDATE SERVICE] Updating Sales Order Sheet: ${soNo}`
+    );
+
+    const updatedOrder = await updateSalesOrderBySoNo(
+      soNo,
+      updates
+    );
+
+    const sheetUpdateTime =
+      performance.now() - sheetUpdateStart;
+
+    console.log(
+      `[SO UPDATE SERVICE] updateSalesOrderBySoNo: ${sheetUpdateTime.toFixed(
+        2
+      )}ms`
+    );
+
+    // =========================================================
+    // 8. NOT FOUND
+    // =========================================================
+
+    if (!updatedOrder) {
+      console.warn(
+        `[SO UPDATE SERVICE] Sales Order not found: ${soNo}`
+      );
+
+      const error = new Error(
+        `Sales Order not found: ${soNo}`
+      );
+
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // =========================================================
+    // 9. FINAL RESULT
+    // =========================================================
+
+    const result = {
+      ...updatedOrder,
+      soQtyInMeter: meterQty,
+    };
+
+    const totalTime = performance.now() - startTime;
+
+    console.log("[SO UPDATE SERVICE] SUCCESS");
+    console.log("[SO UPDATE SERVICE] Result:", result);
+    console.log(
+      `[SO UPDATE SERVICE] TOTAL SERVICE TIME: ${totalTime.toFixed(
+        2
+      )}ms`
+    );
+
+    console.log("----------------------------------------\n");
+
+    return result;
+  } catch (error) {
+    const totalTime = performance.now() - startTime;
+
+    console.error("\n----------------------------------------");
+    console.error("[SO UPDATE SERVICE] FAILED");
+    console.error("[SO UPDATE SERVICE] SO No:", soNo);
+    console.error("[SO UPDATE SERVICE] Error:", error);
+    console.error(
+      "[SO UPDATE SERVICE] Message:",
+      error.message
+    );
+    console.error(
+      "[SO UPDATE SERVICE] Status:",
+      error.statusCode || 500
+    );
+    console.error(
+      `[SO UPDATE SERVICE] FAILED AFTER: ${totalTime.toFixed(
+        2
+      )}ms`
+    );
+    console.error("----------------------------------------\n");
+
     throw error;
   }
-
-  if (!skucode) {
-    const error = new Error("SKU Code is required");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (soQty == null || Number(soQty) < 0) {
-    const error = new Error("Valid SO Quantity is required");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // =========================================================
-  // 2. GET PRODUCT MASTER
-  // Cached lookup = low latency
-  // =========================================================
-
-  const productRow = await getProductMasterCached(skucode);
-
-  if (!productRow) {
-    const error = new Error(`Product not found for SKU: ${skucode}`);
-    error.statusCode = 404;
-    throw error;
-  }
-
-  // =========================================================
-  // 3. PRODUCT MASTER DATA
-  // =========================================================
-
-  const basicUnit = productRow[PRODUCT_COLUMNS.UNIT];
-
-  const meterPerRoll =
-    Number(productRow[PRODUCT_COLUMNS.METERPERROLL]) || 0;
-
-  const meterPerKg =
-    Number(productRow[PRODUCT_COLUMNS.METERPERKG]) || 0;
-
-  // =========================================================
-  // 4. CONVERT SO QTY → METER
-  // =========================================================
-
-  const meterQty = await convertToMeter({
-    qty: Number(soQty),
-    unit,
-    basicUnit,
-    meterPerRoll,
-    meterPerKg,
-  });
-
-  // =========================================================
-  // 5. FINAL RATE
-  // =========================================================
-
-  const calculatedFinalRate =
-    rate != null
-      ? Number(rate) + Number(rateadjustment || 0)
-      : Number(finalrate || 0);
-
-  // =========================================================
-  // 6. BUILD UPDATE OBJECT
-  // =========================================================
-
-  const updates = {
-    soQty: Number(soQty),
-    rate: Number(rate || 0),
-    rateadjustment: Number(rateadjustment || 0),
-    finalrate: calculatedFinalRate,
-    unit,
-    jobWork: Boolean(jobWork),
-    shippinglocation: shippinglocation?.trim() || "",
-    billinglocation: billinglocation?.trim() || "",
-    route: route?.trim() || "",
-    skucode,
-    soQtyInMeter: meterQty,
-  };
-
-  // =========================================================
-  // 7. UPDATE SALES ORDER
-  // =========================================================
-
-  const updatedOrder = await updateSalesOrderBySoNo(
-    soNo,
-    updates
-  );
-
-  if (!updatedOrder) {
-    const error = new Error(`Sales Order not found: ${soNo}`);
-    error.statusCode = 404;
-    throw error;
-  }
-
-  return {
-    ...updatedOrder,
-    soQtyInMeter: meterQty,
-  };
 };
