@@ -442,3 +442,53 @@ export const getAllJobWorkOrders = async (req, res) => {
     });
   }
 };
+
+
+
+export const addCommitedDateToOrder = async (req, res) => {
+  try {
+   
+    const { committedDate, updatedBy,cycleID,division } = req.body;
+
+    if (!cycleID) {
+      return res.status(400).json({
+        success: false,
+        message: "Cycle ID is required",
+      });
+    }
+
+    if (!division) {
+      return res.status(400).json({
+        success: false,
+        message: "Division is required",
+      });
+    }
+
+    if (!committedDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Committed date is required",
+      });
+    }
+
+    const updatedOrder = await updateProductionOrderService({
+      cycleID,
+      division,
+      committedDate,
+      updatedBy,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Committed date updated successfully",
+      productionOrder: updatedOrder,
+    });
+  } catch (error) {
+    console.error("❌ addCommitedDateToOrder error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

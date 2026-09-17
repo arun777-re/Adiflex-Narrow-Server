@@ -411,7 +411,7 @@ export const addNewProductToFG = async ({
       product,
       division,
     });
-
+fgCache.clear();
     return {
       success: true,
       skuCode,

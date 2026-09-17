@@ -89,7 +89,8 @@ export const PRODUCTION_COLUMNS = {
 
   STATUS: 34,                // AH
   UPDATED_BY: 35,             // AI
-  UPDATED_TIME: 36,           // AJ
+  UPDATED_TIME: 36,     
+  COMMITED_DATE:37,      // AJ
 };
 
 // =====================================================

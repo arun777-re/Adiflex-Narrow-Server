@@ -6,6 +6,7 @@ import {
   setCache,
   clearCache,
 } from "../services/product.cache.service.js";
+import { addNewProductToFG } from "./fgSheets.js";
 
 const spreadsheetId = process.env.PRODUCT_MASTER_SHEET_ID;
 const CACHE_KEY = "products";
@@ -99,7 +100,7 @@ export const getProductsService = async () => {
 
     console.time("💾 Set product cache");
 
-    setCache(CACHE_KEY, products, 30 * 60 * 1000);
+    setCache(CACHE_KEY, products, 12 * 60 * 60 * 1000);
 
     console.timeEnd("💾 Set product cache");
 
@@ -152,80 +153,108 @@ export const createProductService = async ({
   meterPerKG,
   createdBy,
 }) => {
-  console.log("🔥 BEFORE PRODUCT AUTH");
+  try {
+    console.log("🔥 BEFORE PRODUCT AUTH");
 
-  const authClient = await auth.getClient();
+    const authClient = await auth.getClient();
 
-  console.log("🔥 PRODUCT AUTH SUCCESS");
+    console.log("🔥 PRODUCT AUTH SUCCESS");
 
-  const rows = await getProductsService();
-  // duplicate check
+    const rows = await getProductsService();
 
-  const isExists = rows
-    .slice(1)
-    .some(
-      (row) =>
-        row[PRODUCT_COLUMNS.PRODUCT_NAME]?.trim().toLowerCase() ===
-          productName.trim().toLowerCase() &&
-        row[PRODUCT_COLUMNS.DIVISION] === division &&
-        (row[PRODUCT_COLUMNS.COLOR] || "").trim().toLowerCase() ===
-          (color || "").trim().toLowerCase() &&
-        (row[PRODUCT_COLUMNS.SIZE] || "").trim().toLowerCase() ===
-          (size || "").trim().toLowerCase() &&
-        (row[PRODUCT_COLUMNS.RATE] || "").trim().toLowerCase() ===
-          (rate || "").trim().toLowerCase(),
-    );
+    // =========================
+    // DUPLICATE CHECK
+    // =========================
+    const isExists = rows
+      .slice(1)
+      .some(
+        (row) =>
+          row[PRODUCT_COLUMNS.PRODUCT_NAME]?.trim().toLowerCase() ===
+            productName.trim().toLowerCase() &&
+          row[PRODUCT_COLUMNS.DIVISION] === division &&
+          (row[PRODUCT_COLUMNS.COLOR] || "").trim().toLowerCase() ===
+            (color || "").trim().toLowerCase() &&
+          (row[PRODUCT_COLUMNS.SIZE] || "").trim().toLowerCase() ===
+            (size || "").trim().toLowerCase() &&
+          (row[PRODUCT_COLUMNS.RATE] || "").trim().toLowerCase() ===
+            (rate || "").trim().toLowerCase()
+      );
 
-  if (isExists) {
-    throw new Error("Product already exists.");
-  }
+    if (isExists) {
+      throw new Error("Product already exists.");
+    }
 
-  // generate sku
-  const sku = await generateSKU(division);
+    // =========================
+    // GENERATE SKU
+    // =========================
+    const sku = await generateSKU(division);
 
-  // append product
-  const values = [
-    [
+    // =========================
+    // ADD PRODUCT TO PRODUCT MASTER
+    // =========================
+    const values = [
+      [
+        sku,
+        productName,
+        division,
+        size,
+        color,
+        rate,
+        unit,
+        meterPerRoll,
+        meterPerKG,
+        "Active",
+        createdBy,
+        new Date().toISOString(),
+        "",
+        "",
+      ],
+    ];
+
+    await sheets.spreadsheets.values.append({
+      auth: authClient,
+      spreadsheetId,
+      range: SHEET_NAMES.PRODUCT_SHEET,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values,
+      },
+    });
+
+    console.log("✅ PRODUCT ADDED TO PRODUCT MASTER:", sku);
+
+    // =========================
+    // ADD PRODUCT TO FG
+    // =========================
+    await addNewProductToFG({
+      skuCode: sku,
+      product: productName,
+      division,
+      availableQty: 0,
+    });
+
+    console.log("✅ PRODUCT ADDED TO FG:", sku);
+
+    // =========================
+    // CLEAR PRODUCT CACHE
+    // =========================
+    clearCache(CACHE_KEY);
+
+    return {
       sku,
       productName,
-      division,
-      size,
-      color,
       rate,
+      division,
       unit,
-      meterPerRoll,
-      meterPerKG,
-      "Active",
-      createdBy,
-      new Date().toISOString(),
-      "",
-      "",
-    ],
-  ];
-
-  await sheets.spreadsheets.values.append({
-    auth: authClient,
-    spreadsheetId,
-    range: SHEET_NAMES.PRODUCT_SHEET,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values,
-    },
-  });
-
-  clearCache(CACHE_KEY);
-
-  return {
-    sku,
-    productName,
-    rate,
-    division,
-    unit,
-    color,
-    size,
-    status: "Active",
-  };
+      color,
+      size,
+      status: "Active",
+    };
+  } catch (error) {
+    console.error("❌ CREATE PRODUCT ERROR:", error);
+    throw error;
+  }
 };
 
 // get product by sku

@@ -1050,3 +1050,58 @@ export const updateProductionWastage = async ({
     nettQtyRTD,
   };
 };
+
+
+// update production orders means add commited date
+export const updateProductionOrderService = async ({
+  cycleID,
+  division,
+  committedDate,
+  updatedBy,
+}) => {
+  const rows = await getProductionOrders(division);
+
+  if (!rows || rows.length <= 1) {
+    throw new Error("No production orders found");
+  }
+
+  // Header skip
+  const rowIndex = rows
+    .slice(1)
+    .findIndex(
+      (row) =>
+        String(row[PRODUCTION_COLUMNS.CYCLE_ID] || "").trim() ===
+        String(cycleID).trim()
+    );
+
+  if (rowIndex === -1) {
+    throw new Error("Production order not found");
+  }
+
+  // +2 because:
+  // 1 = header
+  // index starts from 0
+  const actualRow = rowIndex + 2;
+
+  const authClient = await auth.getClient();
+
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId,
+    range: `${SHEET_NAMES.PRODUCTION_PROCESS}!${PRODUCTION_COLUMNS.COMMITTED_DATE}${actualRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[committedDate]],
+    },
+  });
+
+  // Updated by bhi save karna ho to second column update ki zarurat nahi,
+  // ek hi API call mein dono columns update kar sakte hain.
+  
+  return {
+    cycleID,
+    division,
+    committedDate,
+    updatedBy,
+  };
+};
