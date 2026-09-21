@@ -422,3 +422,28 @@ fgCache.clear();
     throw error;
   }
 };
+
+// update fg inventory
+export const updateFGInventoryRow = async ({
+  rowNumber,
+  fgAvailableQty,
+}) => {
+  const authClient = await auth.getClient();
+
+  const range = `${SHEET_NAMES.INVENTORY_SHEET}!${FG_COLUMNS_LETTERS.AVAILABLE_QTY}${rowNumber}`;
+
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[fgAvailableQty]],
+    },
+  });
+
+  return {
+    range,
+    fgAvailableQty,
+  };
+};
