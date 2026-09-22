@@ -55,8 +55,9 @@ export const createDispatch = async (
       vehicleNo,
       customer,
       partyPO,
+      boxes
     } = req.body;
-
+console.log("boxesss",boxes)
     if (!driverName?.trim()) {
       throw new Error("Driver Name is required");
     }
@@ -91,6 +92,7 @@ export const createDispatch = async (
       driverName,
       partyPO,
       vehicleNo,
+      boxes
     });
 
     return res.status(200).json({

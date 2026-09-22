@@ -37,7 +37,7 @@ export const appendDispatch = async ({ values }) => {
 export const getAllDispatchOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:W`,
+    range: `${SHEET_NAMES.DISPATCH_SHEET}!A2:X`,
   });
 
   const rows = response.data.values || [];
@@ -111,6 +111,7 @@ export const dispatchOrder = async ({
   driverName,
   vehicleNo,
   partyPO,
+  boxes
 }) => {
   console.time("Dispatch Starts");
 
@@ -120,6 +121,7 @@ export const dispatchOrder = async ({
     dispatchQty,
     freight,
     freightRs,
+    boxes
   });
 
   // =====================================================
@@ -163,6 +165,7 @@ export const dispatchOrder = async ({
 
   console.time("⏱️ READ");
 
+  // PARALLEL 
   const [dispatchResponse, salesRows] = await Promise.all([
     sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -267,6 +270,10 @@ export const dispatchOrder = async ({
           range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.STATUS}${rowNumber}`,
           values: [[status]],
         },
+        {
+          range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.BOXES_CARTRIDGE}${rowNumber}`,
+          values: [[boxes]],
+        },
 
         {
           range: `${SHEET_NAMES.DISPATCH_SHEET}!${DISPATCH_SHEET_COLUMNS.UPDATED_AT}${rowNumber}`,
@@ -292,7 +299,6 @@ export const dispatchOrder = async ({
   // =====================================================
 
   console.time("⏱️ Sales Order Update");
-
   await updateSalesOrderAfterDispatch({
     soNo,
     product,
@@ -302,7 +308,7 @@ export const dispatchOrder = async ({
 
   console.timeEnd("⏱️ Sales Order Update");
 
-appendBillingOrder({
+await appendBillingOrder({
   soNo,
   skuCode: dispatchRow[DISPATCH_COLUMNS.SKU_CODE],
   cycleID,
@@ -310,7 +316,10 @@ appendBillingOrder({
   billinglocation:dispatchRow[DISPATCH_COLUMNS.BILLING_LOCATION] || "",
   product,
   customer: dispatchRow[DISPATCH_COLUMNS.CUSTOMER],
-  partyPO: dispatchRow[DISPATCH_COLUMNS.PARTY_PO],
+  partyPO:partyPO || "",
+  driverName:driverName || "",
+  vehicleNo:vehicleNo || "",
+  boxes:boxes || 0,
   route: dispatchRow[DISPATCH_COLUMNS.ROUTE],
   division: dispatchRow[DISPATCH_COLUMNS.DIVISION],
   dispatchQty: qty,

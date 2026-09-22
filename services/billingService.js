@@ -20,6 +20,9 @@ export const appendBillingOrder = async ({
   partyPO,
   route,
   division,
+  driverName,
+  vehicleNo,
+  boxes,
   dispatchQty,
 }) => {
   const now = new Date().toLocaleString();
@@ -36,8 +39,12 @@ export const appendBillingOrder = async ({
     partyPO,
     route,
     division,
+    driverName,
+    vehicleNo,
+    boxes,
     dispatchQty,
   });
+  console.log("driver Name:",driverName,"vehicleNo:",vehicleNo,"boxesss:",boxes,"shipping",shippinglocation,"billing:",billinglocation)
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: process.env.BILLING_SHEET_ID,
@@ -58,6 +65,9 @@ export const appendBillingOrder = async ({
           partyPO,
           route,
           division,
+          driverName,
+          vehicleNo,
+          boxes,
           Number(dispatchQty),
           "Pending",
           now,
@@ -72,7 +82,7 @@ export const appendBillingOrder = async ({
 export const getBillingOrders = async () => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.BILLING_SHEET_ID,
-    range: `${SHEET_NAMES.BILLING_SHEET}!A:N`,
+    range: `${SHEET_NAMES.BILLING_SHEET}!A:Q`,
   });
 
   const rows = response.data.values || [];
@@ -96,6 +106,9 @@ export const getBillingOrders = async () => {
     division: row[BILLING_COLUMNS.DIVISION] || "",
     dispatchQty: Number(row[BILLING_COLUMNS.DISPATCH_QTY]) || 0,
     billing: row[BILLING_COLUMNS.BILLING] || "Pending",
+    driverName:row[BILLING_COLUMNS.DRIVER_NAME] || "",
+    vehicleNo:row[BILLING_COLUMNS.VEHICLE_NO] || 0,
+    boxes:row[BILLING_COLUMNS.BOX_CARTRIDGE] || 0,
     createdAt: row[BILLING_COLUMNS.CREATED_AT] || "",
   }));
 };
