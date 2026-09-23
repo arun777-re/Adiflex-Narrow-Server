@@ -163,8 +163,7 @@ export const completeDailyTask = async (req, res) => {
   }
 };
 
-
-// get weekly performance of employees
+// get weekly performance of employee
 export const getWeeklyPerformanceOfEmployee = async (req, res) => {
   try {
     const { userID, startDate, endDate } = req.query;
@@ -181,38 +180,48 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
     }
 
     // =========================================================
-    // 2. GET DAILY TASK LOGS
+    // 2. GET ASSIGNED DAILY TASKS
+    // =========================================================
+
+    const allTasks = await getAllDailyTasks();
+
+    const employeeTasks = (allTasks || []).filter(
+      (task) => String(task.assignedTo || "").trim() === String(userID).trim(),
+    );
+  
+    // =========================================================
+    // 3. GET DAILY TASK LOGS
     // =========================================================
 
     const dailyTaskLogs = await getDailyTaskLogs();
 
-    if (!dailyTaskLogs || dailyTaskLogs.length === 0) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          userID,
-          startDate,
-          endDate,
-          summary: {
-            assigned: 0,
-            completed: 0,
-            pending: 0,
-            onTime: 0,
-            late: 0,
-            score: 0,
-          },
-          logs: [],
-        },
-      });
+    // =========================================================
+    // 4. GENERATE DATE RANGE
+    // =========================================================
+
+    const dates = [];
+
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+
+    for (
+      let date = new Date(start);
+      date <= end;
+      date.setDate(date.getDate() + 1)
+    ) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+
+      dates.push(`${year}-${month}-${day}`);
     }
 
     // =========================================================
-    // 3. FILTER EMPLOYEE + DATE RANGE
+    // 5. FILTER EMPLOYEE LOGS
     // =========================================================
 
-    const employeeLogs = dailyTaskLogs.filter((log) => {
+    const employeeLogs = (dailyTaskLogs || []).filter((log) => {
       const logUserID = String(log.userID || "").trim();
-
       const logDate = String(log.taskDate || "").trim();
 
       return (
@@ -223,22 +232,87 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
     });
 
     // =========================================================
-    // 4. BASIC PERFORMANCE COUNTS
+    // 6. CREATE LOG LOOKUP
     // =========================================================
 
-    const assigned = employeeLogs.length;
+    const logMap = new Map();
 
-    const completedLogs = employeeLogs.filter(
-      (log) =>
-        String(log.status || "").toUpperCase() === "COMPLETED"
-    );
+    employeeLogs.forEach((log) => {
+      const key = `${String(log.taskID || "").trim()}_${String(
+        log.taskDate || "",
+      ).trim()}`;
 
-    const completed = completedLogs.length;
+      logMap.set(key, log);
+    });
+
+    // =========================================================
+    // 7. CREATE EXPECTED TASK OCCURRENCES
+    // =========================================================
+
+    const assignedTaskOccurrences = [];
+
+    dates.forEach((taskDate) => {
+      employeeTasks.forEach((task) => {
+        assignedTaskOccurrences.push({
+          taskID: task.taskId,
+          taskName: task.description,
+          assignedTo: task.assignedTo,
+          taskDate,
+          department:task.department
+        });
+      });
+    });
+   
+    // =========================================================
+    // 8. CHECK COMPLETION
+    // =========================================================
+
+    const performanceLogs = assignedTaskOccurrences.map((task) => {
+      const key = `${String(task.taskID || "").trim()}_${task.taskDate}`;
+
+      const log = logMap.get(key);
+
+      const status = String(log?.status || "").toUpperCase();
+
+      const completed = status === "COMPLETED";
+
+      return {
+        taskID: task.taskID,
+        taskName: task.taskName,
+        taskDate: task.taskDate,
+        assignedTo: task.assignedTo,
+        status: completed ? "COMPLETED" : "NOT_COMPLETED",
+        completedAt: log?.completedAt || null,
+      };
+    });
+
+    // =========================================================
+    // 9. PERFORMANCE COUNTS
+    // =========================================================
+
+    const assigned = performanceLogs.length;
+
+    const completed = performanceLogs.filter(
+      (task) => task.status === "COMPLETED",
+    ).length;
 
     const pending = assigned - completed;
 
+    const completionPercentage =
+      assigned > 0 ? Number(((completed / assigned) * 100).toFixed(2)) : 0;
+
+    const score = completionPercentage;
+
     // =========================================================
-    // 5. RESPONSE
+    // 10. PENDING TASKS
+    // =========================================================
+
+    const pendingTasks = performanceLogs.filter(
+      (task) => task.status === "NOT_COMPLETED" || task.status === "",
+    );
+
+    // =========================================================
+    // 11. RESPONSE
     // =========================================================
 
     return res.status(200).json({
@@ -255,10 +329,13 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
           pending,
           onTime: 0,
           late: 0,
-          score: 0,
+          completionPercentage,
+          score,
         },
 
-        logs: employeeLogs,
+        pendingTasks,
+
+        logs: performanceLogs,
       },
     });
   } catch (error) {
@@ -266,7 +343,7 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: error.message || "Internal Server Error",
     });
   }
 };
