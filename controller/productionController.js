@@ -8,6 +8,7 @@ import {
   getProductionOrders,
   getProductionByProcess,
   updateProductionWastage,
+  updateProductionOrderService,
 } from "../services/productionSheet.js";
 import { getSalesOrders } from "../services/salesOrderSheet.js";
 
@@ -182,8 +183,8 @@ export const getAllProductionOrders = async (req, res) => {
       updatedBy: row[PRODUCTION_COLUMNS.UPDATED_BY] || "",
 
       updatedTime: row[PRODUCTION_COLUMNS.UPDATED_TIME] || "",
+      committedDate:row[PRODUCTION_COLUMNS.COMMITEDATA] || ""
     }));
-console.log("productionOrders", productionOrders);
     return res.status(200).json({
       success: true,
 
@@ -449,7 +450,7 @@ export const addCommitedDateToOrder = async (req, res) => {
   try {
    
     const { committedDate, updatedBy,cycleID,division } = req.body;
-
+console.log("req.body",req.body)
     if (!cycleID) {
       return res.status(400).json({
         success: false,

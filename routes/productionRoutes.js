@@ -7,7 +7,8 @@ import {
   completeProduction,
   updateWastage,
   completeQuality,
-  getAllJobWorkOrders
+  getAllJobWorkOrders,
+  addCommitedDateToOrder
 } from "../controller/productionController.js";
 
 const router = express.Router();
@@ -50,5 +51,7 @@ router.post(
 );
 
 router.get('/job-work/:division',getAllJobWorkOrders);
+
+router.patch('/add-commited-date',addCommitedDateToOrder);
 
 export default router;

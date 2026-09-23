@@ -1,4 +1,4 @@
-import sheets, { getCurrentDateTime, getDatabaseByDivision, updateCell } from "../config/db.js";
+import sheets, { auth, getCurrentDateTime, getDatabaseByDivision, updateCell } from "../config/db.js";
 
 import { PROCESS_MAP, PRODUCTION_COLUMNS,PRODUCTION_SHEET_COLUMNS } from "../constants/processMap.js";
 import {
@@ -8,6 +8,7 @@ import {
 import { handleInternalFG } from "./fgSheets.js";
 import { updateManufacturedQty } from "./salesOrderSheet.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 // =====================================================
 // GET PRODUCTION ORDERS
@@ -1039,7 +1040,7 @@ export const updateProductionWastage = async ({
   await updateCell({
     division,
 
-    range: `AH${rowNumber}`,
+    range: `${PRODUCTION_SHEET_COLUMNS.PACKING_END}${rowNumber}`,
 
     value: now,
   });
@@ -1084,20 +1085,14 @@ export const updateProductionOrderService = async ({
   const actualRow = rowIndex + 2;
 
   const authClient = await auth.getClient();
-
-  await sheets.spreadsheets.values.update({
-    auth: authClient,
-    spreadsheetId,
-    range: `${SHEET_NAMES.PRODUCTION_PROCESS}!${PRODUCTION_COLUMNS.COMMITTED_DATE}${actualRow}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[committedDate]],
-    },
-  });
-
+  updateCell({
+    division:division,
+    range:`${PRODUCTION_SHEET_COLUMNS.COMMITED_DATE}${actualRow}`,
+   value:committedDate
+  })
   // Updated by bhi save karna ho to second column update ki zarurat nahi,
   // ek hi API call mein dono columns update kar sakte hain.
-  
+   
   return {
     cycleID,
     division,

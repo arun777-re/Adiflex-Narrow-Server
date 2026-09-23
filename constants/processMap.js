@@ -87,10 +87,10 @@ export const PRODUCTION_COLUMNS = {
   // FINAL DATA
   // ==========================================
 
-  STATUS: 34,                // AH
-  UPDATED_BY: 35,             // AI
-  UPDATED_TIME: 36,     
-  COMMITED_DATE:37,      // AJ
+  STATUS: 34,       
+  COMMITEDATA:35,         // AH
+  UPDATED_BY: 36,             // AI
+  UPDATED_TIME: 37,     
 };
 
 // =====================================================
@@ -338,8 +338,9 @@ export const PRODUCTION_SHEET_COLUMNS = {
   // ==========================================
 
   STATUS: "AI",
-  UPDATED_BY: "AJ",
-  UPDATED_TIME: "AK",
+  COMMITED_DATE:"AJ",
+  UPDATED_BY: "AK",
+  UPDATED_TIME: "AL",
 };
 
 
