@@ -34,7 +34,7 @@ export const getProductionOrders = async (division) => {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
 
-    range: "Production_Process!A1:AK",
+    range: "Production_Process!A1:AM",
   });
 
   return response.data.values || [];

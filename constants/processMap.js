@@ -90,7 +90,8 @@ export const PRODUCTION_COLUMNS = {
   STATUS: 34,       
   COMMITEDATA:35,         // AH
   UPDATED_BY: 36,             // AI
-  UPDATED_TIME: 37,     
+  UPDATED_TIME: 37,
+  ASSIGNED_AT:38,     
 };
 
 // =====================================================
@@ -341,6 +342,7 @@ export const PRODUCTION_SHEET_COLUMNS = {
   COMMITED_DATE:"AJ",
   UPDATED_BY: "AK",
   UPDATED_TIME: "AL",
+  ASSIGNED_AT:"AM",
 };
 
 

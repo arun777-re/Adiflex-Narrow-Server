@@ -106,7 +106,6 @@ export const getAllProductionOrders = async (req, res) => {
     const rows = await getProductionOrders(division);
 
     const data = rows.slice(1);
-
     const productionOrders = data.map((row, index) => ({
       rowNumber: index + 2,
       id:
@@ -184,6 +183,7 @@ export const getAllProductionOrders = async (req, res) => {
 
       updatedTime: row[PRODUCTION_COLUMNS.UPDATED_TIME] || "",
       committedDate: row[PRODUCTION_COLUMNS.COMMITEDATA] || "",
+      receivedAt:row[PRODUCTION_COLUMNS.ASSIGNED_AT] || ""
     }));
     return res.status(200).json({
       success: true,

@@ -118,7 +118,7 @@ export const appendSalesOrderToProductionProcess = async (
         await sheets.spreadsheets.values.append({
           auth: authClient,
           spreadsheetId,
-          range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:J`,
+          range: `${SHEET_NAMES.PRODUCTION_SHEET}!A:AM`,
           valueInputOption: "USER_ENTERED",
           insertDataOption: "INSERT_ROWS",
           requestBody: {
