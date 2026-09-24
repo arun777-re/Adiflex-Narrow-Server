@@ -31,7 +31,8 @@ export const SALES_COLUMNS = {
   BILLING_LOCATION: 23,        // X
   SHIPPING_LOCATION: 24,       // Y
 
-  ORDER_AMOUNT: 25,             // Z
+  ORDER_AMOUNT: 25,     
+  COMMITED_DATE:26,        // Z
 };
 
 export const SALES_COLUMN_LETTERS = {
@@ -68,4 +69,5 @@ export const SALES_COLUMN_LETTERS = {
   SHIPPING_LOCATION: "Y",
 
   ORDER_AMOUNT: "Z",
+  COMMITED_DATE:"AA",
 };

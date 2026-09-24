@@ -1,14 +1,24 @@
-import sheets, { auth, getCurrentDateTime, getDatabaseByDivision, updateCell } from "../config/db.js";
+import sheets, {
+  auth,
+  getCurrentDateTime,
+  getDatabaseByDivision,
+  updateCell,
+} from "../config/db.js";
 
-import { PROCESS_MAP, PRODUCTION_COLUMNS,PRODUCTION_SHEET_COLUMNS } from "../constants/processMap.js";
+import {
+  PROCESS_MAP,
+  PRODUCTION_COLUMNS,
+  PRODUCTION_SHEET_COLUMNS,
+} from "../constants/processMap.js";
 import {
   createNextProductionCycle,
   handleFinishedGoods,
 } from "../helpers/productionHelpers.js";
 import { handleInternalFG } from "./fgSheets.js";
-import { updateManufacturedQty } from "./salesOrderSheet.js";
+import { getSalesOrders, updateManufacturedQty } from "./salesOrderSheet.js";
 import { sendNotification } from "../helpers/notificationHelper.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
+import { SALES_COLUMN_LETTERS, SALES_COLUMNS } from "../constants/salesColumns.js";
 
 // =====================================================
 // GET PRODUCTION ORDERS
@@ -137,8 +147,8 @@ const validatePreviousProcess = (row, process) => {
 // FIND PRODUCTION ORDER
 // =====================================================
 
-const findProductionOrder = (rows, soNo, product,cycleID) => {
-  console.log("hsjdfhjskfh......",cycleID)
+const findProductionOrder = (rows, soNo, product, cycleID) => {
+  console.log("hsjdfhjskfh......", cycleID);
   const index = rows.findIndex(
     (row) =>
       row[PRODUCTION_COLUMNS.SO_NO] === soNo &&
@@ -173,11 +183,10 @@ export const startProductionProcess = async ({
   updatedBy,
   division,
 }) => {
-
   const rows = await getProductionOrders(division);
 
-  const { rowNumber, row } = findProductionOrder(rows, soNo, product,cycleID);
-  console.log("rows.........",rows,"row",row,"rowNumber",rowNumber);
+  const { rowNumber, row } = findProductionOrder(rows, soNo, product, cycleID);
+  console.log("rows.........", rows, "row", row, "rowNumber", rowNumber);
 
   const processMap = PROCESS_MAP[process];
 
@@ -269,7 +278,6 @@ export const startProductionProcess = async ({
 // COMPLETE PRODUCTION PROCESS
 // =====================================================
 
-
 export const completeProductionProcess = async ({
   soNo,
   cycleID,
@@ -303,7 +311,7 @@ export const completeProductionProcess = async ({
       rows,
       soNo,
       product,
-      cycleID
+      cycleID,
     );
 
     console.timeEnd("⏱️ 2. findProductionOrder");
@@ -311,7 +319,6 @@ export const completeProductionProcess = async ({
     if (!row || !rowNumber) {
       throw new Error("Production order not found");
     }
-
 
     // =========================================================
     // 3. PROCESS CONFIG
@@ -327,7 +334,6 @@ export const completeProductionProcess = async ({
 
     console.timeEnd("⏱️ 3. processConfig");
 
-
     // =========================================================
     // 4. VALIDATE PREVIOUS PROCESS
     // =========================================================
@@ -337,7 +343,6 @@ export const completeProductionProcess = async ({
     validatePreviousProcess(row, process);
 
     console.timeEnd("⏱️ 4. validatePreviousProcess");
-
 
     // =========================================================
     // 5. CURRENT PROCESS STATUS
@@ -371,13 +376,9 @@ export const completeProductionProcess = async ({
     // =========================================================
 
     if (process === firstProcess) {
-
       console.log("🚀 FIRST PROCESS COMPLETION FLOW");
 
-      const targetQty = Number(
-        row[PRODUCTION_COLUMNS.TARGET_QTY]
-      );
-
+      const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY]);
 
       // =======================================================
       // VALIDATE PRODUCTION QTY
@@ -396,21 +397,16 @@ export const completeProductionProcess = async ({
       const qty = Number(productionQty);
 
       if (Number.isNaN(qty) || qty <= 0) {
-        throw new Error(
-          "Production Qty must be greater than 0"
-        );
+        throw new Error("Production Qty must be greater than 0");
       }
 
       if (qty > targetQty) {
-        throw new Error(
-          "Production Qty cannot exceed Target Qty"
-        );
+        throw new Error("Production Qty cannot exceed Target Qty");
       }
 
       const remainingQty = targetQty - qty;
 
       console.timeEnd("⏱️ 7. validateProductionQty");
-
 
       // =======================================================
       // UPDATE PRODUCTION QTY
@@ -425,7 +421,6 @@ export const completeProductionProcess = async ({
       });
 
       console.timeEnd("⏱️ 8. updateProductionQty");
-
 
       // =======================================================
       // COMPLETE CURRENT PROCESS
@@ -449,7 +444,6 @@ export const completeProductionProcess = async ({
 
       console.timeEnd("⏱️ 9. completeCurrentProcess");
 
-
       // =======================================================
       // UPDATED BY
       // =======================================================
@@ -463,7 +457,6 @@ export const completeProductionProcess = async ({
       });
 
       console.timeEnd("⏱️ 10. updateUpdatedBy");
-
 
       // =======================================================
       // UPDATED TIME
@@ -483,14 +476,9 @@ export const completeProductionProcess = async ({
       // =======================================================
 
       if (remainingQty > 0) {
+        console.log(`🔥 Remaining Qty: ${remainingQty}`);
 
-        console.log(
-          `🔥 Remaining Qty: ${remainingQty}`
-        );
-
-        const skucode =
-          row[PRODUCTION_COLUMNS.SKU_CODE];
-
+        const skucode = row[PRODUCTION_COLUMNS.SKU_CODE];
 
         // -------------------------------------------------------
         // CURRENT CYCLE STATUS
@@ -505,7 +493,6 @@ export const completeProductionProcess = async ({
         });
 
         console.timeEnd("⏱️ 12. updateCurrentCycleStatus");
-
 
         // -------------------------------------------------------
         // CREATE NEXT CYCLE
@@ -522,13 +509,10 @@ export const completeProductionProcess = async ({
 
         console.timeEnd("⏱️ 13. createNextProductionCycle");
 
-
         console.log(
-          `🔥 Next cycle created | ${soNo} | Remaining: ${remainingQty}`
+          `🔥 Next cycle created | ${soNo} | Remaining: ${remainingQty}`,
         );
-
       } else {
-
         console.time("⏱️ 12. completeFinalCycle");
 
         await updateCell({
@@ -540,19 +524,16 @@ export const completeProductionProcess = async ({
         console.timeEnd("⏱️ 12. completeFinalCycle");
       }
 
-
       console.timeEnd(TOTAL_TIMER);
 
       return true;
     }
-
 
     // =========================================================
     // 8. OTHER PROCESSES
     // =========================================================
 
     console.log("🚀 OTHER PROCESS FLOW:", process);
-
 
     // =========================================================
     // COMPLETE PROCESS
@@ -576,7 +557,6 @@ export const completeProductionProcess = async ({
 
     console.timeEnd("⏱️ 14. completeProcess");
 
-
     // =========================================================
     // UPDATED BY
     // =========================================================
@@ -590,7 +570,6 @@ export const completeProductionProcess = async ({
     });
 
     console.timeEnd("⏱️ 15. updateUpdatedBy");
-
 
     // =========================================================
     // UPDATED TIME
@@ -606,37 +585,28 @@ export const completeProductionProcess = async ({
 
     console.timeEnd("⏱️ 16. updateUpdatedTime");
 
-
     // =========================================================
     // PACKING COMPLETION
     // =========================================================
 
     if (process === "packing") {
-
       console.log("🚀 PACKING COMPLETION FLOW");
 
       console.time("⏱️ 17. packingCalculations");
 
       const manufacturedQty = Number(
-        row[PRODUCTION_COLUMNS.PRODUCTION_QTY] || 0
+        row[PRODUCTION_COLUMNS.PRODUCTION_QTY] || 0,
       );
 
-      const wastageQty = Number(
-        row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0
-      );
+      const wastageQty = Number(row[PRODUCTION_COLUMNS.WASTAGE_QTY] || 0);
 
-      const targetQty = Number(
-        row[PRODUCTION_COLUMNS.TARGET_QTY]
-      );
+      const targetQty = Number(row[PRODUCTION_COLUMNS.TARGET_QTY]);
 
       if (manufacturedQty > targetQty) {
-        throw new Error(
-          "Production Qty cannot exceed Target Qty"
-        );
+        throw new Error("Production Qty cannot exceed Target Qty");
       }
 
       console.timeEnd("⏱️ 17. packingCalculations");
-
 
       // =======================================================
       // FINISHED GOODS
@@ -656,7 +626,6 @@ export const completeProductionProcess = async ({
 
       console.timeEnd("⏱️ 18. handleFinishedGoods");
 
-
       // =======================================================
       // PACKING STATUS
       // =======================================================
@@ -670,7 +639,6 @@ export const completeProductionProcess = async ({
       });
 
       console.timeEnd("⏱️ 19. packingStatus");
-
 
       // =======================================================
       // DISPATCH NOTIFICATION
@@ -687,20 +655,14 @@ export const completeProductionProcess = async ({
         reference: soNo,
       })
         .then(() => {
-          console.log(
-            "🔥 Notification sent to dispatch team"
-          );
+          console.log("🔥 Notification sent to dispatch team");
         })
         .catch((error) => {
-          console.error(
-            "❌ Error sending dispatch notification:",
-            error
-          );
+          console.error("❌ Error sending dispatch notification:", error);
         });
 
       console.timeEnd("⏱️ 20. dispatchNotification");
     }
-
 
     // =========================================================
     // TOTAL
@@ -709,21 +671,14 @@ export const completeProductionProcess = async ({
     console.timeEnd(TOTAL_TIMER);
 
     return true;
-
   } catch (error) {
-
-    console.error(
-      "❌ completeProductionProcess error:",
-      error
-    );
+    console.error("❌ completeProductionProcess error:", error);
 
     console.timeEnd(TOTAL_TIMER);
 
     throw error;
   }
 };
-
-
 
 // =====================================================
 // COMPLETE QUALITY + WASTAGE
@@ -779,7 +734,6 @@ export const completeQualityWithWastage = async ({
     throw new Error("Wastage cannot be greater than Production Qty");
   }
 
-
   const now = new Date().toLocaleString();
 
   // QUALITY END
@@ -809,12 +763,11 @@ export const completeQualityWithWastage = async ({
     value: wastage,
   });
 
-
   // update manufactured qty in sales_order sheet
   await updateManufacturedQty({
     soNo: soNo,
     product: product,
-    manufacturedQty:productionQty,
+    manufacturedQty: productionQty,
   });
 
   // UPDATED BY
@@ -1052,7 +1005,6 @@ export const updateProductionWastage = async ({
   };
 };
 
-
 // update production orders means add commited date
 export const updateProductionOrderService = async ({
   cycleID,
@@ -1060,43 +1012,89 @@ export const updateProductionOrderService = async ({
   committedDate,
   updatedBy,
 }) => {
-  const rows = await getProductionOrders(division);
+  try {
+    const rows = await getProductionOrders(division);
 
-  if (!rows || rows.length <= 1) {
-    throw new Error("No production orders found");
-  }
+    if (!rows || rows.length <= 1) {
+      throw new Error("No production orders found");
+    }
 
-  // Header skip
-  const rowIndex = rows
-    .slice(1)
-    .findIndex(
-      (row) =>
-        String(row[PRODUCTION_COLUMNS.CYCLE_ID] || "").trim() ===
-        String(cycleID).trim()
+    // Header skip
+    const rowIndex = rows
+      .slice(1)
+      .findIndex(
+        (row) =>
+          String(row[PRODUCTION_COLUMNS.CYCLE_ID] || "").trim() ===
+          String(cycleID).trim(),
+      );
+
+    if (rowIndex === -1) {
+      throw new Error("Production order not found");
+    }
+
+    // +2 because:
+    // 1 = header
+    // index starts from 0
+    const actualRow = rowIndex + 2;
+    const productionRow = rows[rowIndex + 1];
+    const soNo = String(productionRow[PRODUCTION_COLUMNS.SO_NO] || "").trim();
+    const skuCode = String(
+      productionRow[PRODUCTION_COLUMNS.SKU_CODE] || "",
+    ).trim();
+
+    if (!soNo || !skuCode) {
+      throw new Error(`So No or SKU code missing for Cycle ID:${cycleID}`);
+    }
+    // const authClient = await auth.getClient();
+    updateCell({
+      division: division,
+      range: `${PRODUCTION_SHEET_COLUMNS.COMMITED_DATE}${actualRow}`,
+      value: committedDate,
+    });
+
+    const salesOrders = await getSalesOrders();
+    if (!salesOrders || salesOrders.length <= 1) {
+      throw new Error("Sales Orders not found");
+    }
+
+    const salesRowIndex = salesOrders
+      .slice(1)
+      .findIndex(
+        (row) =>
+          String(row[SALES_COLUMNS.SO_NO] || "").trim() ===
+            String(soNo).trim() &&
+          String(row[SALES_COLUMNS.SKU_CODE] || "").trim() ===
+            String(skuCode).trim(),
+      );
+    if (salesRowIndex === -1) {
+      throw new Error(
+        `Sales Order Not Found for SoNo:${soNo},skuCode:${skuCode}`,
+      );
+    }
+
+    const salesActualRow = salesRowIndex + 2;
+    const spreadsheetID = process.env.GOOGLE_SHEET_ID;
+
+    await updateCell({
+      spreadsheetId: spreadsheetID,
+      sheetName: `${SHEET_NAMES.SALES_MASTER}`,
+      range: `${SALES_COLUMN_LETTERS.COMMITED_DATE}${salesActualRow}`,
+      value: committedDate,
+    });
+    // Updated by bhi save karna ho to second column update ki zarurat nahi,
+    // ek hi API call mein dono columns update kar sakte hain.
+
+    return {
+      cycleID,
+      division,
+      committedDate,
+      updatedBy,
+    };
+  } catch (error) {
+    console.error("❌ updateProductionOrderService Error:", error);
+
+    throw new Error(
+      error?.message || "Failed to update production order committed date",
     );
-
-  if (rowIndex === -1) {
-    throw new Error("Production order not found");
   }
-
-  // +2 because:
-  // 1 = header
-  // index starts from 0
-  const actualRow = rowIndex + 2;
-
-  const authClient = await auth.getClient();
-  updateCell({
-    division:division,
-    range:`${PRODUCTION_SHEET_COLUMNS.COMMITED_DATE}${actualRow}`,
-   value:committedDate
-  })
-  // Updated by bhi save karna ho to second column update ki zarurat nahi,
-  // ek hi API call mein dono columns update kar sakte hain.
-   
-  return {
-    cycleID,
-    division,
-    committedDate,
-    updatedBy,
-  };
 };

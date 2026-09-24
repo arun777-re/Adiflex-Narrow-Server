@@ -23,7 +23,7 @@ export const getSalesOrders = async () => {
 
     spreadsheetId: salesOrderSpreadsheetId,
 
-    range: `${SHEET_NAMES.SALES_MASTER}!A:Z`,
+    range: `${SHEET_NAMES.SALES_MASTER}!A:AA`,
   });
 
   return response.data.values || [];

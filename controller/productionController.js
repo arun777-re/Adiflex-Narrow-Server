@@ -183,7 +183,7 @@ export const getAllProductionOrders = async (req, res) => {
       updatedBy: row[PRODUCTION_COLUMNS.UPDATED_BY] || "",
 
       updatedTime: row[PRODUCTION_COLUMNS.UPDATED_TIME] || "",
-      committedDate:row[PRODUCTION_COLUMNS.COMMITEDATA] || ""
+      committedDate: row[PRODUCTION_COLUMNS.COMMITEDATA] || "",
     }));
     return res.status(200).json({
       success: true,
@@ -402,9 +402,7 @@ export const getAllJobWorkOrders = async (req, res) => {
 
           orderType: row[PRODUCTION_COLUMNS.ORDER_TYPE] || "",
 
-          productionTargetQty: Number(
-            row[PRODUCTION_COLUMNS.TARGET_QTY] || 0,
-          ),
+          productionTargetQty: Number(row[PRODUCTION_COLUMNS.TARGET_QTY] || 0),
 
           division: row[PRODUCTION_COLUMNS.DIVISION] || "",
 
@@ -444,13 +442,10 @@ export const getAllJobWorkOrders = async (req, res) => {
   }
 };
 
-
-
 export const addCommitedDateToOrder = async (req, res) => {
-  try {
-   
-    const { committedDate, updatedBy,cycleID,division } = req.body;
-console.log("req.body",req.body)
+  try {  
+    const { committedDate, updatedBy, cycleID, division } = req.body;
+    console.log("req.body", req.body);
     if (!cycleID) {
       return res.status(400).json({
         success: false,
