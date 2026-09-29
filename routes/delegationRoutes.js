@@ -6,8 +6,7 @@ const router = express.Router();
 
 router.post('/create',createDelegationTask);
 router.get('/get-active',getActiveDelegationTasks);
-router.patch('/update-delegation',completeDelegationTask)
-
+router.patch('/complete/:taskID',completeDelegationTask);
 
 
 export default router;
