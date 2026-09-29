@@ -2,6 +2,7 @@ import sheets,{auth} from "../config/db.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 
 export const appendNotification = async ({
+  userID,
   role,
   division,
   type,
@@ -17,7 +18,7 @@ export const appendNotification = async ({
   await sheets.spreadsheets.values.append({
     auth: authClient,
     spreadsheetId:process.env.NOTIFICATION_SHEET_ID,
-    range: `${SHEET_NAMES.NOTIFICATIONS}!A:J`,
+    range: `${SHEET_NAMES.NOTIFICATIONS}!A:K`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [[
@@ -30,6 +31,7 @@ export const appendNotification = async ({
         reference,
         false,
         null,
+        userID,
         createdAt,
       ]],
     },

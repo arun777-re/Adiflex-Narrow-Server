@@ -17,32 +17,11 @@ export const initSocket = (server) => {
 
     console.log("Client Connected :", socket.id);
 
-    socket.on("join-room", ({ role, division }) => {
-    console.log("JOIN REQUEST:", role, division);
-      if (role === "productionSupervisor") {
-
-        socket.join(
-          `productionSupervisor:${division.toLowerCase()}`
-        );
-
-        console.log(
-          `${socket.id} joined productionSupervisor:${division}`
-        );
-      }else{
-        socket.join(role);
-        
-        console.log(
-          `${socket.id} joined:${role}`
-        );
-      }
-
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("Disconnected :", socket.id,reason);
-    });
-     socket.on("error", (err) => {
-    console.log(err);
+    socket.on("join-room", ({ userID }) => {
+      if(!userID) return;
+      const room = `user:${userID}`;
+      socket.join(room);
+      console.log(  `👤 ${userID} joined ${room}`);
   });
 
   });

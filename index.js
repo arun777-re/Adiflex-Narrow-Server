@@ -17,6 +17,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import analyticsRoutes from './routes/analysticsRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import dailyTaskRoutes from './routes/dailyTask.route.js';
+import delegationTaskRoutes from './routes/delegationRoutes.js';
 
 
 
@@ -55,6 +56,7 @@ app.use('/notifications',notificationRoutes);
 app.use('/analytics',analyticsRoutes);
 app.use('/activities',activityRoutes);
 app.use('/daily-tasks',dailyTaskRoutes);
+app.use('/delegation-tasks',delegationTaskRoutes);
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

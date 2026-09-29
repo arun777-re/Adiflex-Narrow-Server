@@ -36,6 +36,9 @@ export const DAILY_TASK_LOG_COLUMNS = {
   ASSIGNED_TO: 5,
   STATUS: 6,
   COMPLETED_AT: 7,
+  ASSIGNED_DATE:8,
+  DUE_DATE:9,
+  
 };
 
 export const DAILY_TASK_LOG_COLUMN_LETTERS = {

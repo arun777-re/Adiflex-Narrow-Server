@@ -1,0 +1,24 @@
+
+export const DELEGATION_COLUMNS = {
+    TASK_ID:0,
+    TASK_NAME:1,
+    ASSIGNED_BY:2,
+    ASSIGNED_TO:3,
+    ASSIGNED_AT:4,
+    DUE_TIME:5,
+    PRIORITY:6,
+    STATUS:7,
+    COMPLETED_AT:8,
+}
+
+export const DELEGATION_COLUMNS_LETTER = {
+     TASK_ID:"A",
+    TASK_NAME:"B",
+    ASSIGNED_BY:"C",
+    ASSIGNED_TO:"D",
+    ASSIGNED_AT:"E",
+    DUE_TIME:"F",
+    PRIORITY:"G",
+    STATUS:"H",
+    COMPLETED_AT:"I",
+}
