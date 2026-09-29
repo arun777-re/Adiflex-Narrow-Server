@@ -178,7 +178,7 @@ export const getActiveDelegationTasks = async (req, res) => {
     const userDelegationTasks = allDelegationTasks.filter(
       (task) =>
         String(task.assignedTo).trim() === String(userID).trim() &&
-        String(task.status).trim().toLowerCase() === "active",
+        String(task.status).trim().toLowerCase() === "pending",
     );
 
     console.log("📋 Active delegation tasks:", userDelegationTasks.length);
