@@ -1,5 +1,8 @@
 import { getCurrentDateTime, updateCell } from "../config/db.js";
-import { DELEGATION_COLUMNS, DELEGATION_COLUMNS_LETTER } from "../constants/delegationColumns.js";
+import {
+  DELEGATION_COLUMNS,
+  DELEGATION_COLUMNS_LETTER,
+} from "../constants/delegationColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import {
   appendDelegation,
@@ -145,7 +148,6 @@ export const getActiveDelegationTasks = async (req, res) => {
 
     // Get all delegation tasks
     const allDelegationTasksRaw = await getDelegations();
-    console.log(allDelegationTasksRaw);
 
     // Make sure response is an array
     if (
@@ -159,9 +161,10 @@ export const getActiveDelegationTasks = async (req, res) => {
       });
     }
 
-    const headers = allDelegationTasksRaw[0];
 
-    const allDelegationTasks = mapDelegationSheet({rows:allDelegationTasksRaw})
+    const allDelegationTasks = mapDelegationSheet({
+      rows: allDelegationTasksRaw,
+    });
 
     console.log("📦 MAPPED DELEGATION DATA:", allDelegationTasks);
 
@@ -196,7 +199,7 @@ export const getActiveDelegationTasks = async (req, res) => {
 export const completeDelegationTask = async (req, res) => {
   try {
     const { taskID } = req.params;
-    const { userID } = req.query;
+    const { userID,userName } = req.query;
 
     if (!taskID) {
       return res.status(400).json({
@@ -227,40 +230,43 @@ export const completeDelegationTask = async (req, res) => {
       });
     }
 
-    const mappedData = mapDelegationSheet({rows:delegationsRaw});
-    console.log("MAPPEDDATA:",mappedData)
+    const mappedData = mapDelegationSheet({ rows: delegationsRaw });
+    console.log("MAPPEDDATA:", mappedData);
 
-    const rowIndex = mappedData.findIndex((row)=>String(row.taskID).trim() === String(taskID).trim() && 
-    String(row.assignedTo).trim() === String(userID).trim() &&
-      String(row.status).toLowerCase() === "pending" )
+    const rowIndex = mappedData.findIndex(
+      (row) =>
+        String(row.taskID).trim() === String(taskID).trim() &&
+        String(row.assignedTo).trim() === String(userID).trim() &&
+        String(row.status).toLowerCase() === "pending",
+    );
 
-    if(rowIndex === -1){
+    if (rowIndex === -1) {
       return res.status(404).json({
-        success:false,
-        message:"Not found"
+        success: false,
+        message: "Not found",
       });
-    } 
+    }
 
     const sheetRow = rowIndex + 2;
-    const range = `${DELEGATION_COLUMNS_LETTER.STATUS}${sheetRow}`
+    const range = `${DELEGATION_COLUMNS_LETTER.STATUS}${sheetRow}`;
 
     // Update STATUS
     await updateCell({
-      spreadsheetId:process.env.DELEGATION_SHEET_ID,
-      sheetName:`${SHEET_NAMES.DELEGATION_SHEET}`,
+      spreadsheetId: process.env.DELEGATION_SHEET_ID,
+      sheetName: `${SHEET_NAMES.DELEGATION_SHEET}`,
       range,
       value: "Completed",
     });
 
     console.log("✅ Delegation task completed:", taskID);
     await sendNotification({
-      userID:"USER0001",
-      role:"admin",
-      division:"all",
-      type:"new-notification",
-      title:`${userID} completed task`,
-      message:`${mappedData[rowIndex].description} completed`
-    })
+      userID: "USER0001",
+      role: "admin",
+      division: "all",
+      type: "new-notification",
+      title: `${userID}:${userName} completed task`,
+      message: `${mappedData[rowIndex].description} completed`,
+    });
 
     return res.status(200).json({
       success: true,
@@ -278,4 +284,71 @@ export const completeDelegationTask = async (req, res) => {
       message: "Internal Server Error",
     });
   }
+};
+
+// this controller used for if user not completed task in given timespan
+export const lateTaskResponse = async (req, res) => {
+  try {
+    const { userID, taskID, userName } = req.query;
+    if (!userID || !taskID || !userName) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Request",
+      });
+    }
+
+    const delegationTasks = await getDelegations();
+
+    if (!Array.isArray(delegationTasks) || delegationTasks.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No Delegation Task to show",
+      });
+    }
+
+    const mappedDelegation = mapDelegationSheet({ rows: delegationTasks });
+
+    const rowIndex = mappedDelegation.findIndex((row) => {
+      return (
+        String(row.assignedTo).trim() === String(userID).trim() &&
+        String(row.taskID).trim() === String(taskID).trim() &&
+        String(row.status).trim().toLowerCase() === "pending"
+      );
+    });
+    if (rowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+    const sheetRow = rowIndex + 2;
+    const range = `${DELEGATION_COLUMNS_LETTER.STATUS}${sheetRow}`;
+
+    // Update STATUS
+    await updateCell({
+      spreadsheetId: process.env.DELEGATION_SHEET_ID,
+      sheetName: `${SHEET_NAMES.DELEGATION_SHEET}`,
+      range,
+      value: "Not Completed",
+    });
+
+    console.log("✅ Delegation task Not Completed in given time:", taskID);
+    await sendNotification({
+      userID: "USER0001",
+      role: "admin",
+      division: "all",
+      type: "new-notification",
+      title: `${userID}:${userName} not completed task`,
+      message: `${mappedDelegation[rowIndex].description} not completed`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Delegation task not completed",
+      data: {
+        taskID,
+        status: "Not Completed",
+      },
+    });
+  } catch (error) {}
 };
