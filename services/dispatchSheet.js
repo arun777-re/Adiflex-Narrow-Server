@@ -323,6 +323,7 @@ await appendBillingOrder({
   route: dispatchRow[DISPATCH_COLUMNS.ROUTE],
   division: dispatchRow[DISPATCH_COLUMNS.DIVISION],
   dispatchQty: qty,
+  rate:dispatchRow[DISPATCH_COLUMNS.RATE]
 }).catch((error) => {
   console.error("❌ Billing append failed:", error);
 });

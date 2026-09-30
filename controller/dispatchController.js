@@ -57,7 +57,7 @@ export const createDispatch = async (
       partyPO,
       boxes
     } = req.body;
-console.log("boxesss",boxes)
+    console.log("boxesss",boxes)
     if (!driverName?.trim()) {
       throw new Error("Driver Name is required");
     }
