@@ -23,6 +23,7 @@ export const appendBillingOrder = async ({
   driverName,
   vehicleNo,
   boxes,
+  rate,
   dispatchQty,
 }) => {
   const now = new Date().toLocaleString();
@@ -42,6 +43,7 @@ export const appendBillingOrder = async ({
     driverName,
     vehicleNo,
     boxes,
+    rate,
     dispatchQty,
   });
   console.log("driver Name:",driverName,"vehicleNo:",vehicleNo,"boxesss:",boxes,"shipping",shippinglocation,"billing:",billinglocation)
@@ -70,6 +72,7 @@ export const appendBillingOrder = async ({
           boxes,
           Number(dispatchQty),
           "Pending",
+          rate,
           now,
         ],
       ],
@@ -109,6 +112,7 @@ export const getBillingOrders = async () => {
     driverName:row[BILLING_COLUMNS.DRIVER_NAME] || "",
     vehicleNo:row[BILLING_COLUMNS.VEHICLE_NO] || 0,
     boxes:row[BILLING_COLUMNS.BOX_CARTRIDGE] || 0,
+    rate:row[BILLING_COLUMNS.RATE] || 0,
     createdAt: row[BILLING_COLUMNS.CREATED_AT] || "",
   }));
 };
