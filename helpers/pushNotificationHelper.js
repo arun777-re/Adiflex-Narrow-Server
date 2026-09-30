@@ -13,9 +13,6 @@ import { SHEET_NAMES } from "../constants/sheetNames.js";
 // =====================================================
 
 export const getPushSubscriptions = async () => {
-
- 
-
   const response =
     await sheets.spreadsheets.values.get({
       spreadsheetId:
@@ -106,21 +103,40 @@ export const findSubscriptionByEndpoint = async (
 // GET SUBSCRIPTIONS FOR USER
 // =====================================================
 
-export const getUserPushSubscriptions = async (
-  userId
-) => {
+export const getUserPushSubscriptions = async (userId) => {
   const rows = await getPushSubscriptions();
 
-  return rows
-    .slice(1)
-    .filter(
-      (row) =>
-        String(
-          row[
-            SUBSCRIPTION_COLUMNS.USER_ID
-          ] || ""
-        ).trim() === String(userId).trim()
+  const normalizedUserId = String(userId || "").trim();
+
+  return rows.slice(1).filter((row) => {
+    const rowUserId = String(
+      row[SUBSCRIPTION_COLUMNS.USER_ID] || ""
+    ).trim();
+
+    const status = String(
+      row[SUBSCRIPTION_COLUMNS.STATUS] || ""
+    ).trim().toUpperCase();
+
+    const endpoint = String(
+      row[SUBSCRIPTION_COLUMNS.ENDPOINT] || ""
+    ).trim();
+
+    const p256dh = String(
+      row[SUBSCRIPTION_COLUMNS.P256DH] || ""
+    ).trim();
+
+    const auth = String(
+      row[SUBSCRIPTION_COLUMNS.AUTH] || ""
+    ).trim();
+
+    return (
+      rowUserId === normalizedUserId &&
+      status === "ACTIVE" &&
+      endpoint &&
+      p256dh &&
+      auth
     );
+  });
 };
 
 

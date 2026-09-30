@@ -1,9 +1,10 @@
 import webpush from "web-push";
-import { appendCell,updateCell } from "../config/db.js";
+import { appendCell, updateCell } from "../config/db.js";
 
 import {
   getPushSubscriptions,
   getSubscriptionsForNotification,
+  getUserPushSubscriptions,
 } from "../helpers/pushNotificationHelper.js";
 
 import {
@@ -11,7 +12,7 @@ import {
   SUBSCRIPTION_COLUMNS,
 } from "../constants/userColumns.js";
 
-import {SHEET_NAMES} from '../constants/sheetNames.js'
+import { SHEET_NAMES } from "../constants/sheetNames.js";
 import { getUsers } from "./googleSheets.js";
 
 // =====================================================
@@ -21,7 +22,7 @@ import { getUsers } from "./googleSheets.js";
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT,
   process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
+  process.env.VAPID_PRIVATE_KEY,
 );
 
 // =====================================================
@@ -37,41 +38,31 @@ const buildPushSubscription = (row) => ({
 });
 
 const isActiveSubscription = (row) =>
-  String(
-    row[SUBSCRIPTION_COLUMNS.STATUS] || ""
-  )
+  String(row[SUBSCRIPTION_COLUMNS.STATUS] || "")
     .trim()
     .toUpperCase() === "ACTIVE";
 
-const sendToSubscription = async ({
-  row,
-  notification,
-}) => {
+const sendToSubscription = async ({ row, notification }) => {
   try {
     await webpush.sendNotification(
       buildPushSubscription(row),
-      JSON.stringify(notification)
+      JSON.stringify(notification),
     );
 
     return {
       success: true,
-      subscriptionId:
-        row[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID],
+      subscriptionId: row[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID],
     };
-
   } catch (error) {
-
     console.error("❌ Push failed:", {
-      subscriptionId:
-        row[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID],
+      subscriptionId: row[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID],
       statusCode: error.statusCode,
       message: error.message,
     });
 
     return {
       success: false,
-      subscriptionId:
-        row[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID],
+      subscriptionId: row[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID],
       statusCode: error.statusCode,
       error: error.message,
     };
@@ -82,26 +73,16 @@ const sendToSubscription = async ({
 // SEND PUSH TO ONE SUBSCRIPTION
 // =====================================================
 
-export const sendPushNotification = async ({
-  subscription,
-  notification,
-}) => {
-
+export const sendPushNotification = async ({ subscription, notification }) => {
   try {
-
-    await webpush.sendNotification(
-      subscription,
-      JSON.stringify(notification)
-    );
+    await webpush.sendNotification(subscription, JSON.stringify(notification));
 
     console.log("✅ PUSH SENT");
 
     return {
       success: true,
     };
-
   } catch (error) {
-
     console.error("❌ Push Notification Error:", {
       statusCode: error.statusCode,
       message: error.message,
@@ -119,32 +100,24 @@ export const sendPushNotification = async ({
 // TEST PUSH
 // =====================================================
 
-export const sendTestPush = async ({
-  userId,
-  notification,
-}) => {
-
+export const sendTestPush = async ({ userId, notification }) => {
   if (!userId) {
     throw new Error("User ID is required");
   }
 
   const rows = await getPushSubscriptions();
-  console.log("push_rows",rows)
+  console.log("push_rows", rows);
 
   const userSubscriptions = rows
     .slice(1)
     .filter(
       (row) =>
-        String(
-          row[SUBSCRIPTION_COLUMNS.USER_ID] || ""
-        ).trim() === String(userId).trim() &&
-        isActiveSubscription(row)
+        String(row[SUBSCRIPTION_COLUMNS.USER_ID] || "").trim() ===
+          String(userId).trim() && isActiveSubscription(row),
     );
 
   if (!userSubscriptions.length) {
-    throw new Error(
-      "No active push subscription found for this user"
-    );
+    throw new Error("No active push subscription found for this user");
   }
 
   const results = await Promise.all(
@@ -152,14 +125,12 @@ export const sendTestPush = async ({
       sendToSubscription({
         row,
         notification,
-      })
-    )
+      }),
+    ),
   );
 
   return {
-    success: results.some(
-      (result) => result.success
-    ),
+    success: results.some((result) => result.success),
     results,
   };
 };
@@ -167,67 +138,109 @@ export const sendTestPush = async ({
 // =====================================================
 // APPLICATION PUSH
 // =====================================================
+// =====================================================
+// APPLICATION PUSH
+// =====================================================
 
-export const sendWebPushNotification = async (
-  notification
-) => {
-
-  console.log("📡 Preparing Web Push:", {
-    role: notification.role,
-    division: notification.division,
-    type: notification.type,
-  });
-
-  const rows =
-    await getSubscriptionsForNotification({
+export const sendWebPushNotification = async (notification) => {
+  try {
+    console.log("📡 Preparing Web Push:", {
+      userID: notification.userID,
       role: notification.role,
       division: notification.division,
+      type: notification.type,
     });
 
-  console.log(
-    `📡 Matching subscriptions: ${rows.length}`
-  );
+    let rows = [];
 
-  if (!rows.length) {
-    console.log(
-      "⚠️ No matching active push subscriptions"
+    // =================================================
+    // USER-SPECIFIC NOTIFICATION
+    // =================================================
+
+    if (notification.userID) {
+      console.log("👤 PUSH TARGET: USER", notification.userID);
+
+      rows = await getUserPushSubscriptions(notification.userID);
+    }
+
+    // =================================================
+    // ROLE + DIVISION NOTIFICATION
+    // =================================================
+    else if (notification.role && notification.division) {
+      console.log("👥 PUSH TARGET: ROLE + DIVISION", {
+        role: notification.role,
+        division: notification.division,
+      });
+
+      rows = await getSubscriptionsForNotification({
+        role: notification.role,
+        division: notification.division,
+      });
+    }
+
+    // =================================================
+    // NO VALID TARGET
+    // =================================================
+    else {
+      console.log("⚠️ No valid push notification target");
+
+      return {
+        success: false,
+        sent: 0,
+        failed: 0,
+        message: "No valid notification target",
+      };
+    }
+
+    console.log(`📡 Matching subscriptions: ${rows.length}`);
+
+    if (!rows.length) {
+      console.log("⚠️ No matching active push subscriptions");
+
+      return {
+        success: true,
+        sent: 0,
+        failed: 0,
+      };
+    }
+
+    // =================================================
+    // SEND PUSH IN PARALLEL
+    // =================================================
+
+    const results = await Promise.all(
+      rows.map((row) =>
+        sendToSubscription({
+          row,
+          notification,
+        }),
+      ),
     );
+
+    const sent = results.filter((result) => result.success).length;
+
+    const failed = results.length - sent;
+
+    console.log("📡 Web Push Result:", {
+      sent,
+      failed,
+    });
 
     return {
       success: true,
+      sent,
+      failed,
+    };
+  } catch (error) {
+    console.error("❌ sendWebPushNotification error:", error);
+
+    return {
+      success: false,
       sent: 0,
       failed: 0,
+      error: error.message,
     };
   }
-
-  // IMPORTANT:
-  // Sequential await ki jagah parallel push
-  const results = await Promise.all(
-    rows.map((row) =>
-      sendToSubscription({
-        row,
-        notification,
-      })
-    )
-  );
-
-  const sent = results.filter(
-    (result) => result.success
-  ).length;
-
-  const failed =
-    results.length - sent;
-
-  console.log("📡 Web Push Result:", {
-    sent,
-    failed,
-  });
-
-  return {
-    success: true,
-    sent,
-    failed,
-  };
 };
 
 // =====================================================
@@ -275,10 +288,7 @@ export const savePushSubscription = async ({
   console.log("==========================================");
 
   console.log("👥 USERS LENGTH:", users?.length);
-  console.log(
-    "🔢 USER_ID COLUMN INDEX:",
-    USER_COLUMNS.USER_ID
-  );
+  console.log("🔢 USER_ID COLUMN INDEX:", USER_COLUMNS.USER_ID);
   console.log("🔎 LOOKING FOR USER:", userId);
 
   // ===================================================
@@ -293,7 +303,7 @@ export const savePushSubscription = async ({
       "NAME:",
       row?.[USER_COLUMNS.NAME],
       "| USER_ID:",
-      row?.[USER_COLUMNS.USER_ID]
+      row?.[USER_COLUMNS.USER_ID],
     );
   });
 
@@ -308,7 +318,7 @@ export const savePushSubscription = async ({
       index > 0 &&
       String(row?.[USER_COLUMNS.NAME] || "")
         .trim()
-        .toLowerCase() === "operator"
+        .toLowerCase() === "operator",
   );
 
   console.log(
@@ -318,13 +328,10 @@ export const savePushSubscription = async ({
           name: operatorRow[USER_COLUMNS.NAME],
           userID: operatorRow[USER_COLUMNS.USER_ID],
         }
-      : "NOT FOUND"
+      : "NOT FOUND",
   );
 
-  console.log(
-    "OPERATOR USER_ID:",
-    operatorRow?.[USER_COLUMNS.USER_ID]
-  );
+  console.log("OPERATOR USER_ID:", operatorRow?.[USER_COLUMNS.USER_ID]);
 
   // ===================================================
   // NORMALIZED USER ID
@@ -346,9 +353,7 @@ export const savePushSubscription = async ({
   users.forEach((row, index) => {
     if (index === 0) return;
 
-    const sheetUserId = String(
-      row?.[USER_COLUMNS.USER_ID] || ""
-    )
+    const sheetUserId = String(row?.[USER_COLUMNS.USER_ID] || "")
       .trim()
       .toLowerCase();
 
@@ -359,7 +364,7 @@ export const savePushSubscription = async ({
       "Sheet USER_ID =",
       sheetUserId,
       "| Match =",
-      isMatch
+      isMatch,
     );
   });
 
@@ -367,19 +372,15 @@ export const savePushSubscription = async ({
   // FIND USER
   // ===================================================
 
-  const userRowIndex = users.findIndex(
-    (row, index) => {
-      if (index === 0) return false;
+  const userRowIndex = users.findIndex((row, index) => {
+    if (index === 0) return false;
 
-      const sheetUserId = String(
-        row?.[USER_COLUMNS.USER_ID] || ""
-      )
-        .trim()
-        .toLowerCase();
+    const sheetUserId = String(row?.[USER_COLUMNS.USER_ID] || "")
+      .trim()
+      .toLowerCase();
 
-      return sheetUserId === normalizedUserId;
-    }
-  );
+    return sheetUserId === normalizedUserId;
+  });
 
   // ===================================================
   // FINAL USER SEARCH RESULT
@@ -393,10 +394,7 @@ export const savePushSubscription = async ({
   if (userRowIndex === -1) {
     console.log("❌ USER NOT FOUND");
     console.log("Incoming User ID:", userId);
-    console.log(
-      "USER_ID COLUMN INDEX:",
-      USER_COLUMNS.USER_ID
-    );
+    console.log("USER_ID COLUMN INDEX:", USER_COLUMNS.USER_ID);
     console.log("==========================================\n");
 
     throw new Error(`User not found: ${userId}`);
@@ -418,14 +416,11 @@ export const savePushSubscription = async ({
   // GET USER DETAILS
   // ===================================================
 
-  const userName =
-    userRow[USER_COLUMNS.NAME] || "";
+  const userName = userRow[USER_COLUMNS.NAME] || "";
 
-  const role =
-    userRow[USER_COLUMNS.ROLE] || "";
+  const role = userRow[USER_COLUMNS.ROLE] || "";
 
-  const division =
-    userRow[USER_COLUMNS.DIVISION] || "";
+  const division = userRow[USER_COLUMNS.DIVISION] || "";
 
   // ===================================================
   // FIND EXISTING SUBSCRIPTION
@@ -435,23 +430,16 @@ export const savePushSubscription = async ({
   console.log("🔍 CHECKING EXISTING SUBSCRIPTION");
   console.log("==========================================");
 
-  console.log(
-    "📦 SUBSCRIPTIONS LENGTH:",
-    subscriptions?.length
-  );
+  console.log("📦 SUBSCRIPTIONS LENGTH:", subscriptions?.length);
 
   const existingIndex = subscriptions.findIndex(
     (row, index) =>
       index > 0 &&
-      String(
-        row[SUBSCRIPTION_COLUMNS.ENDPOINT] || ""
-      ).trim() === String(endpoint).trim()
+      String(row[SUBSCRIPTION_COLUMNS.ENDPOINT] || "").trim() ===
+        String(endpoint).trim(),
   );
 
-  console.log(
-    "EXISTING SUBSCRIPTION INDEX:",
-    existingIndex
-  );
+  console.log("EXISTING SUBSCRIPTION INDEX:", existingIndex);
 
   const now = new Date().toISOString();
 
@@ -462,13 +450,9 @@ export const savePushSubscription = async ({
   if (existingIndex !== -1) {
     console.log("♻️ Existing subscription found");
 
-    const existingRow =
-      subscriptions[existingIndex];
+    const existingRow = subscriptions[existingIndex];
 
-    const subscriptionId =
-      existingRow[
-        SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID
-      ];
+    const subscriptionId = existingRow[SUBSCRIPTION_COLUMNS.SUBSCRIPTION_ID];
 
     const updatedRow = [
       subscriptionId,
@@ -481,34 +465,24 @@ export const savePushSubscription = async ({
       keys.auth,
       deviceName,
       ipAddress,
-      existingRow[
-        SUBSCRIPTION_COLUMNS.CREATED_AT
-      ] || now,
+      existingRow[SUBSCRIPTION_COLUMNS.CREATED_AT] || now,
       now,
       "ACTIVE",
     ];
 
     await updateCell({
-      spreadsheetId:
-        process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-      sheetName:
-        SHEET_NAMES.PUSH_SHEET,
+      sheetName: SHEET_NAMES.PUSH_SHEET,
 
-      range:
-        `A${existingIndex + 1}:M${existingIndex + 1}`,
+      range: `A${existingIndex + 1}:M${existingIndex + 1}`,
 
       value: updatedRow,
     });
 
-    console.log(
-      "♻️ PUSH SUBSCRIPTION UPDATED:",
-      subscriptionId
-    );
+    console.log("♻️ PUSH SUBSCRIPTION UPDATED:", subscriptionId);
 
-    console.log(
-      "==========================================\n"
-    );
+    console.log("==========================================\n");
 
     return {
       success: true,
@@ -524,8 +498,7 @@ export const savePushSubscription = async ({
   console.log("🆕 No existing subscription found");
   console.log("➡️ Creating new subscription...");
 
-  const subscriptionId =
-    `SUB${Date.now()}`;
+  const subscriptionId = `SUB${Date.now()}`;
 
   const newRow = [
     subscriptionId,
@@ -544,25 +517,18 @@ export const savePushSubscription = async ({
   ];
 
   await appendCell({
-    spreadsheetId:
-      process.env.GOOGLE_SHEET_ID,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-    sheetName:
-      SHEET_NAMES.PUSH_SHEET,
+    sheetName: SHEET_NAMES.PUSH_SHEET,
 
     range: "A:M",
 
     value: newRow,
   });
 
-  console.log(
-    "🆕 PUSH SUBSCRIPTION CREATED:",
-    subscriptionId
-  );
+  console.log("🆕 PUSH SUBSCRIPTION CREATED:", subscriptionId);
 
-  console.log(
-    "==========================================\n"
-  );
+  console.log("==========================================\n");
 
   return {
     success: true,

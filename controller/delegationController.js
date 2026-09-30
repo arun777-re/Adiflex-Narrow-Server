@@ -96,12 +96,14 @@ export const createDelegationTask = async (req, res) => {
     // ==========================================
     // SEND NOTIFICATION
     // ==========================================
-    await sendNotification({
+    void sendNotification({
       userID: assignedTo,
       type: "DELEGATION",
       title: "New Delegation Task",
       message: description,
       reference: taskID,
+    }).catch((err)=>{
+      console.error("❌ Delegation notification failed:", err)
     });
 
     // ==========================================
@@ -259,13 +261,15 @@ export const completeDelegationTask = async (req, res) => {
     });
 
     console.log("✅ Delegation task completed:", taskID);
-    await sendNotification({
+   void sendNotification({
       userID: "USER0001",
       role: "admin",
       division: "all",
       type: "new-notification",
       title: `${userID}:${userName} completed task`,
       message: `${mappedData[rowIndex].description} completed`,
+    }).catch((err)=>{
+      console.error("❌ Delegation notification failed:", err)
     });
 
     return res.status(200).json({
@@ -333,13 +337,15 @@ export const lateTaskResponse = async (req, res) => {
     });
 
     console.log("✅ Delegation task Not Completed in given time:", taskID);
-    await sendNotification({
+    void sendNotification({
       userID: "USER0001",
       role: "admin",
       division: "all",
       type: "new-notification",
       title: `${userID}:${userName} not completed task`,
       message: `${mappedDelegation[rowIndex].description} not completed`,
+    }).catch((err)=>{
+      console.error("❌ Delegation notification failed:", err);
     });
 
     return res.status(200).json({
