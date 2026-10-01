@@ -163,7 +163,9 @@ export const completeDailyTask = async (req, res) => {
   }
 };
 
-// get weekly performance of employee
+// =========================================================
+// GET WEEKLY PERFORMANCE OF EMPLOYEE
+// =========================================================
 export const getWeeklyPerformanceOfEmployee = async (req, res) => {
   try {
     const { userID, startDate, endDate } = req.query;
@@ -179,30 +181,87 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
       });
     }
 
+    const normalizedUserID = String(userID).trim();
+
     // =========================================================
-    // 2. GET ASSIGNED DAILY TASKS
+    // 2. NORMALIZE DATE
+    // =========================================================
+
+    const normalizeDate = (value) => {
+      if (!value) return "";
+
+      const date = String(value).trim();
+
+      // Already YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return date;
+      }
+
+      // DD-MM-YYYY
+      const match = date.match(/^(\d{2})-(\d{2})-(\d{4})/);
+
+      if (match) {
+        const [, day, month, year] = match;
+
+        return `${year}-${month}-${day}`;
+      }
+
+      // If datetime comes like:
+      // 2026-10-01T10:20:30
+      if (date.includes("T")) {
+        return date.split("T")[0];
+      }
+
+      return date.substring(0, 10);
+    };
+
+    // =========================================================
+    // 3. GET ALL FIXED DAILY TASKS
     // =========================================================
 
     const allTasks = await getAllDailyTasks();
 
-    const employeeTasks = (allTasks || []).filter(
-      (task) => String(task.assignedTo || "").trim() === String(userID).trim(),
-    );
-  
+    // Only tasks assigned to this employee
+    const employeeTasks = (allTasks || []).filter((task) => {
+      const assignedTo = String(
+        task.assignedTo ??
+          task.ASSIGNED_TO ??
+          task.userID ??
+          task.USER_ID ??
+          "",
+      ).trim();
+
+      return assignedTo === normalizedUserID;
+    });
+
     // =========================================================
-    // 3. GET DAILY TASK LOGS
+    // 4. GET DAILY TASK LOGS
     // =========================================================
 
     const dailyTaskLogs = await getDailyTaskLogs();
 
     // =========================================================
-    // 4. GENERATE DATE RANGE
+    // 5. GENERATE DATE RANGE
     // =========================================================
 
     const dates = [];
 
     const start = new Date(`${startDate}T00:00:00`);
     const end = new Date(`${endDate}T00:00:00`);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid startDate or endDate",
+      });
+    }
+
+    if (start > end) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate cannot be greater than endDate",
+      });
+    }
 
     for (
       let date = new Date(start);
@@ -217,62 +276,155 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
     }
 
     // =========================================================
-    // 5. FILTER EMPLOYEE LOGS
+    // 6. FILTER EMPLOYEE LOGS
     // =========================================================
 
     const employeeLogs = (dailyTaskLogs || []).filter((log) => {
-      const logUserID = String(log.userID || "").trim();
-      const logDate = String(log.taskDate || "").trim();
+      const logUserID = String(
+        log.userID ?? log.USER_ID ?? log.assignedTo ?? log.ASSIGNED_TO ?? "",
+      ).trim();
+
+      const logDate = normalizeDate(
+        log.taskDate ?? log.TASK_DATE ?? log.date ?? log.DATE ?? "",
+      );
 
       return (
-        logUserID === String(userID).trim() &&
+        logUserID === normalizedUserID &&
         logDate >= startDate &&
         logDate <= endDate
       );
     });
 
     // =========================================================
-    // 6. CREATE LOG LOOKUP
+    // 7. CREATE LOG LOOKUP
+    //
+    // KEY:
+    //
+    // TASK_ID + DATE
+    //
+    // Example:
+    //
+    // TSK0022_2026-10-01
+    //
+    // If multiple logs exist for same task/date,
+    // COMPLETED always wins.
     // =========================================================
 
     const logMap = new Map();
 
     employeeLogs.forEach((log) => {
-      const key = `${String(log.taskID || "").trim()}_${String(
-        log.taskDate || "",
-      ).trim()}`;
+      const taskID = String(
+        log.taskID ?? log.TASK_ID ?? log.taskId ?? "",
+      ).trim();
 
-      logMap.set(key, log);
+      const taskDate = normalizeDate(log.taskDate ?? log.TASK_DATE ?? "");
+
+      if (!taskID || !taskDate) {
+        return;
+      }
+
+      const key = `${taskID}_${taskDate}`;
+
+      const status = String(log.status ?? log.STATUS ?? "")
+        .trim()
+        .toUpperCase();
+
+      const existingLog = logMap.get(key);
+
+      // =======================================================
+      // IF ANY LOG IS COMPLETED,
+      // KEEP IT AS COMPLETED
+      // =======================================================
+
+      if (status === "COMPLETED") {
+        logMap.set(key, {
+          ...log,
+          status: "COMPLETED",
+          normalizedDate: taskDate,
+        });
+
+        return;
+      }
+
+      // If no previous log exists, store current log
+      if (!existingLog) {
+        logMap.set(key, {
+          ...log,
+          status,
+          normalizedDate: taskDate,
+        });
+      }
     });
 
     // =========================================================
-    // 7. CREATE EXPECTED TASK OCCURRENCES
+    // 8. CREATE EXPECTED DAILY TASK OCCURRENCES
+    //
+    // Fixed tasks × selected dates
+    //
+    // Example:
+    //
+    // 3 tasks
+    // 7 days
+    //
+    // assigned = 21
     // =========================================================
 
     const assignedTaskOccurrences = [];
 
     dates.forEach((taskDate) => {
       employeeTasks.forEach((task) => {
+        const taskID = String(
+          task.taskId ?? task.taskID ?? task.TASK_ID ?? "",
+        ).trim();
+
+        const taskName = String(
+          task.description ??
+            task.taskName ??
+            task.task_name ??
+            task.TASK_NAME ??
+            task.DESCRIPTION ??
+            "",
+        ).trim();
+
+        const assignedTo = String(
+          task.assignedTo ??
+            task.ASSIGNED_TO ??
+            task.userID ??
+            task.USER_ID ??
+            normalizedUserID,
+        ).trim();
+
+        const department = String(
+          task.department ?? task.DEPARTMENT ?? "",
+        ).trim();
+
+        // Don't create invalid task occurrence
+        if (!taskID) {
+          return;
+        }
+
         assignedTaskOccurrences.push({
-          taskID: task.taskId,
-          taskName: task.description,
-          assignedTo: task.assignedTo,
+          taskID,
+          taskName,
+          assignedTo,
           taskDate,
-          department:task.department
+          department,
         });
       });
     });
-   
+
     // =========================================================
-    // 8. CHECK COMPLETION
+    // 9. CHECK EACH TASK AGAINST LOGS
     // =========================================================
 
     const performanceLogs = assignedTaskOccurrences.map((task) => {
-      const key = `${String(task.taskID || "").trim()}_${task.taskDate}`;
+      const key = `${task.taskID}_${task.taskDate}`;
 
       const log = logMap.get(key);
 
-      const status = String(log?.status || "").toUpperCase();
+      const status = String(log?.status ?? log?.STATUS ?? "")
+        .trim()
+        .toUpperCase();
 
       const completed = status === "COMPLETED";
 
@@ -281,13 +433,16 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
         taskName: task.taskName,
         taskDate: task.taskDate,
         assignedTo: task.assignedTo,
+        department: task.department,
+
         status: completed ? "COMPLETED" : "NOT_COMPLETED",
-        completedAt: log?.completedAt || null,
+
+        completedAt: log?.completedAt ?? log?.COMPLETED_AT ?? null,
       };
     });
 
     // =========================================================
-    // 9. PERFORMANCE COUNTS
+    // 10. PERFORMANCE COUNTS
     // =========================================================
 
     const assigned = performanceLogs.length;
@@ -296,7 +451,9 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
       (task) => task.status === "COMPLETED",
     ).length;
 
-    const pending = assigned - completed;
+    const pending = performanceLogs.filter(
+      (task) => task.status === "NOT_COMPLETED",
+    ).length;
 
     const completionPercentage =
       assigned > 0 ? Number(((completed / assigned) * 100).toFixed(2)) : 0;
@@ -304,22 +461,22 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
     const score = completionPercentage;
 
     // =========================================================
-    // 10. PENDING TASKS
+    // 11. PENDING TASKS
     // =========================================================
 
     const pendingTasks = performanceLogs.filter(
-      (task) => task.status === "NOT_COMPLETED" || task.status === "",
+      (task) => task.status === "NOT_COMPLETED",
     );
 
     // =========================================================
-    // 11. RESPONSE
+    // 12. FINAL RESPONSE
     // =========================================================
 
     return res.status(200).json({
       success: true,
 
       data: {
-        userID,
+        userID: normalizedUserID,
         startDate,
         endDate,
 
@@ -327,8 +484,10 @@ export const getWeeklyPerformanceOfEmployee = async (req, res) => {
           assigned,
           completed,
           pending,
+
           onTime: 0,
           late: 0,
+
           completionPercentage,
           score,
         },
