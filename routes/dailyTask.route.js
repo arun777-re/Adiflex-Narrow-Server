@@ -1,34 +1,37 @@
 import express from "express";
-
-import {
-  getDailyTasks,
-  createTask,
-  updateTask,
-  getDailyTaskForEmployee,
-  completeDailyTask,
-  getWeeklyPerformanceOfEmployee,
-} from "../controller/dailyTask.controller.js";
+import { getAllTasks,createTask,getTasksByUserId,deleteTask,updateTask, completeDailyTask, getPerformanceOfEmployee } from "../controller/sql/daily_task.controller.js";
+import {authMiddleware,requireAdmin} from '../middleware/auth.middleware.js';
+// import {
+//   getDailyTasks,
+//   createTask,
+//   updateTask,
+//   getDailyTaskForEmployee,
+//   completeDailyTask,
+//   getWeeklyPerformanceOfEmployee,
+// } from "../controller/dailyTask.controller.js";
 
 const router = express.Router();
 
 
 // GET all recurring tasks
-router.get("/get", getDailyTasks);
+router.get("/get",authMiddleware,getAllTasks);
 
 
 // CREATE recurring task
-router.post("/create", createTask);
+router.post("/create",authMiddleware,requireAdmin,createTask);
 
 
 // UPDATE recurring task
-router.patch("/update/:taskId", updateTask);
+router.patch("/update/:taskId",authMiddleware,requireAdmin,updateTask);
+
+router.delete("/delete/:taskId",authMiddleware,requireAdmin,deleteTask);
 
 
 // employe routes 
-router.get('/employee-gettasks',getDailyTaskForEmployee);
-router.post('/complete-task',completeDailyTask);
+router.get('/employee-gettasks',authMiddleware,getTasksByUserId);
+router.post('/complete-task',authMiddleware,completeDailyTask);
 
-router.get('/get-score',getWeeklyPerformanceOfEmployee)
+router.get('/get-score',authMiddleware,authMiddleware,getPerformanceOfEmployee)
 
 
 export default router;

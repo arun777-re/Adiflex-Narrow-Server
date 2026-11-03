@@ -59,3 +59,8 @@ export const DAILY_TASK_STATUS = {
   OVERDUE: "Overdue",
   CANCELLED: "Cancelled",
 };
+
+export const DAILY_TASKS_TYPES = [
+  "daily_task",
+  "delegation_task",
+];

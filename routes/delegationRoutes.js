@@ -1,13 +1,13 @@
 import express, { Router } from 'express';
-import { completeDelegationTask, createDelegationTask, getActiveDelegationTasks, lateTaskResponse } from '../controller/delegationController.js';
+import { completeDailyTask, getAllActiveDelegationTask } from '../controller/sql/daily_task.controller.js';
+import { authMiddleware } from '../middleware/auth.middleware.js';
 
 
 const router = express.Router();
 
-router.post('/create',createDelegationTask);
-router.get('/get-active',getActiveDelegationTasks);
-router.patch('/complete/:taskID',completeDelegationTask);
-router.patch('/not-completed',lateTaskResponse);
+router.get('/get-active',authMiddleware,getAllActiveDelegationTask);
+router.patch('/complete/:taskID',authMiddleware,completeDailyTask);
+// router.patch('/not-completed',lateTaskResponse);
   
 
 export default router;

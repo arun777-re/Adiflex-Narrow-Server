@@ -1,4 +1,5 @@
 import sheets, { auth } from "../config/db.js";
+import pool from "../config/postgresDB.js";
 import { PRODUCT_COLUMNS } from "../constants/productColumns.js";
 import { SHEET_NAMES } from "../constants/sheetNames.js";
 import {
@@ -140,6 +141,20 @@ export const generateSKU = async (division) => {
 
   return `${prefix}${String(lastNumber + 1).padStart(4, "0")}`;
 };
+
+export const generateSKUCode = async(division)=>{
+  const prefix = String(division).toLowerCase() === "woven" ? "WV" : "CR";
+  const query = `
+  SELECT COALESCE(
+  MAX(CAST(SUBSTRING(sku_code FROM 3) AS INTEGER)),
+  0) AS "lastNumber" FROM product_master
+  WHERE sku_code LIKE $1
+  `;
+
+  const {rows} = await pool.query(query,[`${prefix}%`]);
+  const lastNumber = Number(rows[0].lastNumber);
+  return `${prefix}${String(lastNumber + 1).padStart(4,"0")}`;
+}
 
 // create product
 export const createProductService = async ({

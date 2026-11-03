@@ -8,16 +8,17 @@ import { getSalesOrders } from "../services/salesOrderSheet.js";
 import { getRateFromSalesOrder } from "./salesOrderHelpers.js";
 import { PRODUCTION_COLUMNS } from "../constants/processMap.js";
 
-
 // =====================================================
 // PRODUCTION CYCLE HELPER
 // =====================================================
 
-export const generateNextCycleId = (
+export const generateNextCycleId = ({
   soNo,
   skucode,
   currentCycleId = null
-) => {
+}) => {
+console.log("coming skucode:....",skucode)
+
   if (!soNo) {
     throw new Error("SO No is required");
   }

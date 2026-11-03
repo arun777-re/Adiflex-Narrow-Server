@@ -122,8 +122,9 @@ export const getDailyTaskForEmployee = async (req, res) => {
 // EMPLOYEE COMPLETE DAILY TASKS
 export const completeDailyTask = async (req, res) => {
   try {
-    const { taskId, userID } = req.body;
-
+    const { taskId} = req.body;
+  const {userID} = req.user;
+  console.log("completeDailyTask controller hit with taskId:", taskId, "and userID:", userID);
     // =========================================
     // VALIDATION
     // =========================================

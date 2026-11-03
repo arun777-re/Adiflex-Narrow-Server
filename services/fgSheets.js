@@ -373,11 +373,6 @@ export const addNewProductToFG = async ({
 
     console.log("🔥 BEFORE FG AUTH");
 
-
-    console.log("🔥 FG AUTH SUCCESS");
-
-   
-
     const now = getCurrentDateTime();
 
     const newFGRow = [
@@ -391,6 +386,8 @@ export const addNewProductToFG = async ({
       "", // H - LOCATION,
       now, // I - CREATED AT/UPDATED AT
     ];
+
+    
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.FG_INVENTORY_SHEET_ID,

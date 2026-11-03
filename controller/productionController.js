@@ -22,7 +22,7 @@ export const startProduction = async (req, res) => {
 
         message: "SO No, Product and Process are required",
       });
-    }
+    } 
 
     await startProductionProcess({
       soNo,

@@ -267,6 +267,7 @@ export const generateNextSoNo = async () => {
   return nextSo;
 };
 
+
 // BATCH UPDATE SALES ORDER CELLS
 export const updateSalesOrderCellsBatch = async ({
   rowNumber,

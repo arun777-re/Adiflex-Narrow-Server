@@ -198,3 +198,44 @@ export const normalizeTaskDate = (value) => {
 
   return datePart;
 };
+
+
+// get previous working day considering weekends and company holidays
+export const getPreviousWorkingDay = async ({ dueDate, client }) => {
+  if (!dueDate) {
+    throw new Error("Due date is required");
+  }
+
+  let effectiveDate = dueDate;
+
+  while (true) {
+    const result = await client.query(
+      `
+        SELECT
+          $1::date AS check_date,
+          EXTRACT(DOW FROM $1::date)::int AS day_of_week,
+          EXISTS (
+            SELECT 1
+            FROM company_holidays
+            WHERE holiday_date = $1::date
+          ) AS is_holiday
+      `,
+      [effectiveDate]
+    );
+
+    const { day_of_week, is_holiday } = result.rows[0];
+
+    // Sunday = 0; company holiday = true
+    if (day_of_week !== 0 && !is_holiday) {
+      return effectiveDate;
+    }
+
+    // Previous calendar day
+    const previousDate = await client.query(
+      `SELECT ($1::date - INTERVAL '1 day')::date AS previous_date`,
+      [effectiveDate]
+    );
+
+    effectiveDate = previousDate.rows[0].previous_date;
+  }
+};

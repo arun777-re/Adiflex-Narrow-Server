@@ -5,7 +5,7 @@ import http from 'http'
 import cors from 'cors';
 import { initSocket } from './socket/socket.js';
 import morgan from 'morgan';
-import authRoutes from './routes/authRoutes.js';
+import authRoutes from './routes/auth.routes.js';
 import salesOrderRoutes from './routes/salesOrderRoutes.js';
 import productionRoutes from './routes/productionRoutes.js';
 import dispatchRoutes from './routes/dispatchRoutes.js';
@@ -18,6 +18,8 @@ import analyticsRoutes from './routes/analysticsRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import dailyTaskRoutes from './routes/dailyTask.route.js';
 import delegationTaskRoutes from './routes/delegationRoutes.js';
+import testRoutes from './routes/testRoutes.js';
+import holidayRoutes from './routes/holiday.routes.js';
 
 
 
@@ -57,6 +59,8 @@ app.use('/analytics',analyticsRoutes);
 app.use('/activities',activityRoutes);
 app.use('/daily-tasks',dailyTaskRoutes);
 app.use('/delegation-tasks',delegationTaskRoutes);
+app.use('/holidays',holidayRoutes);
+app.use('/test',testRoutes);
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

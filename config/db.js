@@ -10,7 +10,7 @@ export const DATABASES = {
 };
 
 export const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
+  keyFile: "config/credentials.json",
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
@@ -132,3 +132,5 @@ export const getCurrentDateTime = () => {
 
   return `${get("day")}-${get("month")}-${get("year")} ${get("hour")}:${get("minute")}:${get("second")} ${get("dayPeriod").toUpperCase()}`;
 };
+
+

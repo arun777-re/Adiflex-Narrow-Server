@@ -1098,3 +1098,22 @@ export const updateProductionOrderService = async ({
     );
   }
 };
+
+
+// SELECT
+//     pm.id AS production_id,
+//     pm.cycle_id,
+//     pm.sku_code,
+//     psm.id AS stage_run_id,
+//     psm.stage_code,
+//     psm.input_qty,
+//     psm.accepted_qty,
+//     psm.wastage_qty,
+//     psm.released_qty,
+//     psm.remaining_qty,
+//     psm.status
+// FROM production_master pm
+// JOIN production_stage_runs psm
+//     ON psm.production_process_id = pm.id
+// WHERE pm.cycle_id = 'ANF00001-WV0008-C2'
+// ORDER BY psm.id;

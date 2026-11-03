@@ -26,3 +26,17 @@ export const SUBSCRIPTION_COLUMNS = {
   UPDATED_AT: 11,
   STATUS: 12,
 };
+
+
+export const USERIDS = {
+  dispatch:"USER0006",
+  productionwoven:"USER0002",
+  qualitydepartment:"USER0023",
+  packingdepartment:"USER0024",
+}
+
+export const ALLOWED_DIVISIONS = [
+  "ALL",
+  "CROCHET",
+  "WOVEN"
+]
