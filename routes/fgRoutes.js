@@ -13,16 +13,18 @@ import { consumeFGStock,getFGAvailableQtyWithSKU,getAllFG,
   updateStock
  } from "../controller/sql/fg.controller.js";
 
+ import {authMiddleware} from '../middleware/auth.middleware.js';
+
 const router = express.Router();
 
 
-router.patch("/consume", consumeFGStock);
+router.patch("/consume",authMiddleware, consumeFGStock);
 
-router.patch("/add", addFGStock);
+router.patch("/add",authMiddleware, addFGStock);
 
-router.get('/all',getAllFG);
-router.get("/:sku", getFGAvailableQtyWithSKU);
-router.patch('/stock/:skucode',updateStock);
+router.get('/all',authMiddleware,getAllFG);
+router.get("/:sku",authMiddleware, getFGAvailableQtyWithSKU);
+router.patch('/stock/:skucode',authMiddleware,updateStock);
 
 
 export default router;

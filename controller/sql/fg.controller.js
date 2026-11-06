@@ -182,6 +182,14 @@ export const getAllFG = async (req, res) => {
 // ==========================================
 
 export const updateStock = async (req, res) => {
+  const {role} = req.user;
+  if(String(role).trim().toLowerCase() !== "dispatch"){
+    return sendResponse({
+      success:false,
+      message:"You are not authorized",
+      statusCode:401,
+    })
+  }
   const startTime = Date.now();
 
   try {
