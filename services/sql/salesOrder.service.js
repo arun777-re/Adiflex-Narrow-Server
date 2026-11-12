@@ -94,6 +94,7 @@ export const cancelSalesOrderService = async (soNo) => {
 };
 
 // update sales order service
+
 export const updateSalesOrderService = async ({
   soNo,
   soQty,
@@ -107,90 +108,213 @@ export const updateSalesOrderService = async ({
   route,
   skucode,
 }) => {
-  const fields = [];
-  const values = [];
+  const client = await pool.connect();
 
-  const addField = (column, value) => {
-    if (
-      value !== undefined &&
-      value !== null &&
-      !(typeof value === "string" && value.trim() === "")
-    ) {
-      fields.push(`${column} = $${values.length + 1}`);
-      values.push(value);
-    }
-  };
+  try {
+    await client.query("BEGIN");
 
-  if (soQty !== undefined) {
-    addField("so_qty", Number(soQty));
-  }
-
-  if (rate !== undefined) {
-    addField("standard_rate", Number(rate));
-  }
-
-  if (rateadjustment !== undefined) {
-    addField("rate_adjustment", Number(rateadjustment));
-  }
-
-  if (finalrate !== undefined) {
-    addField("final_rate", Number(finalrate));
-  }
-
-  if (unit !== undefined) {
-    addField("unit", unit);
-  }
-
-  if (jobWork !== undefined) {
-    addField("job_work", Boolean(jobWork));
-  }
-
-  if (shippinglocation !== undefined) {
-    addField("shipping_location", shippinglocation);
-  }
-
-  if (billinglocation !== undefined) {
-    addField("billing_location", billinglocation);
-  }
-
-  if (route !== undefined) {
-    addField("route", route);
-  }
-
-  if (!fields.length) {
-    const error = new Error("At least one field must be provided for update.");
-
-    error.statusCode = 400;
-    throw error;
-  }
-
-  values.push(soNo);
-  const soNoParam = `$${values.length}`;
-
-  values.push(skucode);
-  const skuParam = `$${values.length}`;
-
-  const query = `
-    UPDATE sales_orders
-    SET ${fields.join(", ")}
-    WHERE so_no = ${soNoParam}
-      AND sku_code = ${skuParam}
-    RETURNING *;
-  `;
-
-  const { rows } = await pool.query(query, values);
-
-  if (!rows.length) {
-    const error = new Error(
-      `Sales Order with so_no ${soNo} and sku_code ${skucode} not found.`,
+    // 1. Find Sales Order
+    const orderResult = await client.query(
+      `SELECT id
+       FROM sales_orders
+       WHERE so_no = $1
+       FOR UPDATE`,
+      [soNo]
     );
 
-    error.statusCode = 404;
-    throw error;
-  }
+    if (!orderResult.rows.length) {
+      const error = new Error(`Sales Order ${soNo} not found.`);
+      error.statusCode = 404;
+      throw error;
+    }
 
-  return rows[0];
+    const orderId = orderResult.rows[0].id;
+
+    // 2. Find Sales Item
+    const itemResult = await client.query(
+      `SELECT *
+       FROM sales_items
+       WHERE sales_order_id = $1
+         AND sku_code = $2
+       FOR UPDATE`,
+      [orderId, skucode]
+    );
+
+    if (!itemResult.rows.length) {
+      const error = new Error(
+        `SKU ${skucode} not found in Sales Order ${soNo}.`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (itemResult.rows.length > 1) {
+      const error = new Error(
+        `Multiple items found for SKU ${skucode}. Use sales_items_id to identify the item.`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const item = itemResult.rows[0];
+    const itemId = item.id;
+
+    // 3. Calculate Quantity and Unit Conversion
+    const selectedUnit = String(
+      unit ?? item.item_unit
+    ).toUpperCase();
+
+    const quantity = Number(soQty ?? item.item_qty);
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Invalid Sales Order quantity.");
+    }
+
+    let quantityInMeter = quantity;
+
+    if (selectedUnit === "ROLL" || selectedUnit === "KG") {
+      const productResult = await client.query(
+        `SELECT meter_per_roll, meter_per_kg
+         FROM product_master
+         WHERE sku_code = $1`,
+        [skucode]
+      );
+
+      if (!productResult.rows.length) {
+        throw new Error(`Product ${skucode} not found.`);
+      }
+
+      const product = productResult.rows[0];
+
+      const conversionFactor =
+        selectedUnit === "ROLL"
+          ? Number(product.meter_per_roll || 0)
+          : Number(product.meter_per_kg || 0);
+
+      if (conversionFactor <= 0) {
+        throw new Error(
+          `Invalid ${selectedUnit} to meter conversion for ${skucode}.`
+        );
+      }
+
+      quantityInMeter = quantity * conversionFactor;
+    } else if (selectedUnit !== "METER") {
+      throw new Error(`Invalid unit: ${selectedUnit}`);
+    }
+
+    // 4. Calculate Rate and Adjustment
+    const currentRate = Number(rate ?? item.item_rate ?? 0);
+
+    const currentAdjustment = Number(
+      rateadjustment ?? item.rate_adjustment ?? 0
+    );
+
+    if (
+      !Number.isFinite(currentRate) ||
+      !Number.isFinite(currentAdjustment)
+    ) {
+      throw new Error("Invalid rate or rate adjustment.");
+    }
+
+    // Adjustment can be positive or negative
+    const calculatedFinalRate = currentRate + currentAdjustment;
+
+    if (calculatedFinalRate < 0) {
+      throw new Error("Final rate cannot be negative.");
+    }
+
+    const calculatedAmount =
+      quantityInMeter * calculatedFinalRate;
+
+    // 5. Update Sales Item
+    await client.query(
+      `UPDATE sales_items
+       SET
+         item_qty = $1,
+         item_qty_meter = $2,
+         item_unit = $3,
+         item_rate = $4,
+         rate_adjustment = $5,
+         final_rate = $6,
+         item_amount = $7,
+         updated_at = NOW()
+       WHERE id = $8`,
+      [
+        quantity,
+        quantityInMeter,
+        selectedUnit,
+        currentRate,
+        currentAdjustment,
+        calculatedFinalRate,
+        calculatedAmount,
+        itemId,
+      ]
+    );
+
+    // 6. Update Sales Order Header
+    await client.query(
+      `UPDATE sales_orders
+       SET
+         shipping_location = COALESCE($1, shipping_location),
+         billing_location = COALESCE($2, billing_location),
+         route = COALESCE($3, route),
+         updated_at = NOW()
+       WHERE id = $4`,
+      [
+        shippinglocation ?? null,
+        billinglocation ?? null,
+        route ?? null,
+        orderId,
+      ]
+    );
+
+    // 7. Recalculate Order Totals
+    await client.query(
+      `UPDATE sales_orders
+       SET
+         total_items = (
+           SELECT COUNT(*)
+           FROM sales_items
+           WHERE sales_order_id = $1
+         ),
+         total_order_qty_meter = (
+           SELECT COALESCE(SUM(item_qty_meter), 0)
+           FROM sales_items
+           WHERE sales_order_id = $1
+         ),
+         order_amount = (
+           SELECT COALESCE(SUM(item_amount), 0)
+           FROM sales_items
+           WHERE sales_order_id = $1
+         ),
+         updated_at = NOW()
+       WHERE id = $1`,
+      [orderId]
+    );
+
+    await client.query("COMMIT");
+
+    return {
+      success: true,
+      message: "Sales Order updated successfully",
+      so_no: soNo,
+      sales_items_id: itemId,
+      item_qty: quantity,
+      item_qty_meter: quantityInMeter,
+      item_rate: currentRate,
+      rate_adjustment: currentAdjustment,
+      final_rate: calculatedFinalRate,
+      item_amount: calculatedAmount,
+    };
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 };
+
 
 /**
  * Create Sales Order

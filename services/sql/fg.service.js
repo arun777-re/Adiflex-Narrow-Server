@@ -288,6 +288,7 @@ export const getFGInventoryService = async () => {
         fg.id,
         fg.product_id AS "productId",
         fg.sku_code AS "sku",
+        fg.size,
         fg.product_name AS "productName",
         fg.division,
         pm.meter_per_roll AS "meterPerRoll",

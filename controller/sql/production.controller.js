@@ -105,7 +105,6 @@ export const getAllProduction = async (req, res) => {
 
     // Always pass one parameter, including for "all".
     const result = await pool.query(query, [normalizedDivision]);
-
     return res.status(200).json({
       success: true,
       message: "Production data fetched successfully",

@@ -165,6 +165,7 @@ export const updateSalesOrder = async (req, res) => {
   }
 };
 
+
 export const createSalesOrder = async (req, res) => {
   try {
     const result = await createSalesOrderService(req);
