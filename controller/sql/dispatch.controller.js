@@ -1,6 +1,7 @@
 // controllers/dispatch.controller.js
 
 import pool from "../../config/postgresDB.js";
+import { sendResponse } from "../../helpers/sql/global.helper.js";
 import { basicDispatchValidation } from "../../validation/dispatch.validation.js";
 
 export const getPendingDispatches = async (req, res) => {
@@ -143,7 +144,6 @@ export const getPendingDispatches = async (req, res) => {
 // POST /api/dispatch/confirm
 // Dispatch confirm + Delivery Challan create
 
-
 export const confirmDispatch = async (req, res) => {
   const client = await pool.connect();
   let transactionStarted = false;
@@ -156,7 +156,13 @@ export const confirmDispatch = async (req, res) => {
     const cleanGstNo = String(gstNo || "").trim() || null;
 
     const parsedGstRate = Number(gstRate);
-    basicDispatchValidation({ items, res,parsedGstRate,cleanDriverName,cleanVehicleNo });
+    basicDispatchValidation({
+      items,
+      res,
+      parsedGstRate,
+      cleanDriverName,
+      cleanVehicleNo,
+    });
 
     const requestedItems = items.map((item) => ({
       reservationId: Number(item.reservationId),
@@ -164,7 +170,7 @@ export const confirmDispatch = async (req, res) => {
     }));
 
     const reservationIds = requestedItems.map((item) => item.reservationId);
-     
+
     if (
       requestedItems.some(
         (item) =>
@@ -601,3 +607,90 @@ export const confirmDispatch = async (req, res) => {
     client.release();
   }
 };
+
+// complete dispatch orders or challan history
+
+
+export const challanHistory = async (req, res) => {
+  try {
+    const query = `
+      WITH challan_items AS (
+        SELECT
+          dci.challan_id,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'id', dci.id,
+              'reservationId', dci.reservation_id,
+              'salesItemId', dci.sales_item_id,
+              'skuCode', dci.sku_code,
+              'productName', dci.product_name,
+              'dispatchedQtyMeter', dci.dispatched_qty_meter,
+              'meterPerRoll', dci.meter_per_roll,
+              'rollQty', dci.roll_qty,
+              'ratePerMeter', dci.rate_per_meter,
+              'amount', dci.amount,
+              'createdAt', dci.created_at
+            )
+            ORDER BY dci.id
+          ) AS items
+
+        FROM delivery_challan_items dci
+        GROUP BY dci.challan_id
+      )
+
+      SELECT
+        dc.id,
+        dc.challan_no AS "challanNo",
+        dc.sales_order_id AS "salesOrderId",
+        dc.challan_date AS "challanDate",
+        dc.billing_location AS "billingLocation",
+        dc.shipping_location AS "shippingLocation",
+        dc.route,
+        dc.driver_name AS "driverName",
+        dc.status,
+        dc.created_by AS "createdBy",
+        dc.created_at AS "createdAt",
+        dc.customer_name AS "customerName",
+        dc.gst_no AS "gstNo",
+        dc.tax_of_gst AS "taxOfGst",
+        dc.amount_including_gst AS "amountIncludingGst",
+        dc.vehicle_no AS "vehicleNo",
+        dc.total_rolls AS "totalRolls",
+        dc.total_amount AS "totalAmount",
+        dc.total_qty_meter AS "totalQtyMeter",
+        dc.gst_rate AS "gstRate",
+
+        COALESCE(ci.items, '[]'::json) AS items
+
+      FROM delivery_challans dc
+
+      LEFT JOIN challan_items ci
+        ON dc.id = ci.challan_id
+
+      ORDER BY dc.created_at DESC;
+    `;
+
+    const result = await pool.query(query);
+
+    return sendResponse({
+      res,
+      message: result.rows.length
+        ? "Challan history fetched successfully"
+        : "No challan records found",
+      data: result.rows,
+      statusCode: 200,
+      success: true,
+    });
+
+  } catch (error) {
+    console.error("Error during get Challan History:", error);
+
+    return sendResponse({
+      res,
+      message: "Internal Server Error during get Challan History",
+      statusCode: 500,
+      success: false,
+    });
+  }
+};
+

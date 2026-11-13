@@ -1,13 +1,10 @@
 import express from "express";
 
 import {
-  getDispatchOrders,
-  
   createDispatch,
-  getAllCompletedDispatchOrders,
   billingDone,
 } from "../controller/dispatchController.js";
-import { confirmDispatch, getPendingDispatches } from "../controller/sql/dispatch.controller.js";
+import { challanHistory, confirmDispatch, getPendingDispatches } from "../controller/sql/dispatch.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -25,7 +22,7 @@ router.post(
 router.get(
   "/completed",
 
-  getAllCompletedDispatchOrders,
+  challanHistory,
 );
 router.post(
   "/billing",
