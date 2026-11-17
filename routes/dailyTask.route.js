@@ -1,5 +1,5 @@
 import express from "express";
-import { getAllTasks,createTask,getTasksByUserId,deleteTask,updateTask, completeDailyTask, getPerformanceOfEmployee } from "../controller/sql/daily_task.controller.js";
+import { getAllTasks,createTask,getTasksByUserId,deleteTask,updateTask, completeDailyTask, getPerformanceOfEmployee, getAllEmployeesPerformance } from "../controller/sql/daily_task.controller.js";
 import {authMiddleware,requireAdmin} from '../middleware/auth.middleware.js';
 // import {
 //   getDailyTasks,
@@ -32,7 +32,7 @@ router.get('/employee-gettasks',authMiddleware,getTasksByUserId);
 router.post('/complete-task',authMiddleware,completeDailyTask);
 
 router.get('/get-score',authMiddleware,requireAdmin,getPerformanceOfEmployee);
-router.get('/all-employee-performance',authMiddleware,requireAdmin,getPerformanceOfEmployee);
+router.get('/all-employee-performance',authMiddleware,requireAdmin,getAllEmployeesPerformance);
 
 
 export default router;
