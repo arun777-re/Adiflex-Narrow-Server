@@ -12,6 +12,10 @@
     reserved_qty_meter DECIMAL(12,2) NOT NULL
     CHECK (reserved_qty_meter > 0),
 
+-- ordered sales item qty 
+    requested_qty_meter DECIMAL(12,2) NOT NULL
+    CHECK (requested_qty_meter > 0)
+
 -- QUANTITY DISPATCHED FROM RESERVATION
     dispatched_qty_meter DECIMAL(12,2) NOT NULL DEFAULT 0
     CHECK (dispatched_qty_meter >= 0),

@@ -81,11 +81,7 @@ export const getFgAvailableQtyService = async (sku) => {
 // CONSUME FG STOCK
 // ============================================================
 
-export const consumeFGStockService = async ({
-  sku,
-  qty,
-  updatedBy,
-}) => {
+export const consumeFGStockService = async ({ sku, qty, updatedBy }) => {
   const client = await pool.connect();
 
   try {
@@ -129,14 +125,13 @@ export const consumeFGStockService = async ({
 
     if (quantity > availableQty) {
       throw new Error(
-        `Insufficient FG stock. Available: ${availableQty}, Required: ${quantity}`
+        `Insufficient FG stock. Available: ${availableQty}, Required: ${quantity}`,
       );
     }
 
     const newAvailableQty = availableQty - quantity;
 
-    const newDispatchedQty =
-      (Number(fg.dispatched_qty_meter) || 0) + quantity;
+    const newDispatchedQty = (Number(fg.dispatched_qty_meter) || 0) + quantity;
 
     // --------------------------------------------------------
     // Update stock
@@ -169,29 +164,22 @@ export const consumeFGStockService = async ({
     await client.query("COMMIT");
 
     return updateResult.rows[0];
-
   } catch (error) {
     await client.query("ROLLBACK");
 
     console.error("consumeFGStockService Error:", error);
 
     throw error;
-
   } finally {
     client.release();
   }
 };
 
-
 // ============================================================
 // ADD FG STOCK
 // ============================================================
 
-export const addFGStockService = async ({
-  sku,
-  qty,
-  updatedBy,
-}) => {
+export const addFGStockService = async ({ sku, qty, updatedBy }) => {
   const client = await pool.connect();
 
   try {
@@ -227,11 +215,9 @@ export const addFGStockService = async ({
 
     const fg = rows[0];
 
-    const oldAvailableQty =
-      Number(fg.available_qty_meter) || 0;
+    const oldAvailableQty = Number(fg.available_qty_meter) || 0;
 
-    const newAvailableQty =
-      oldAvailableQty + quantity;
+    const newAvailableQty = oldAvailableQty + quantity;
 
     // --------------------------------------------------------
     // Update stock
@@ -262,24 +248,20 @@ export const addFGStockService = async ({
     await client.query("COMMIT");
 
     return updateResult.rows[0];
-
   } catch (error) {
     await client.query("ROLLBACK");
 
     console.error("addFGStockService Error:", error);
 
     throw error;
-
   } finally {
     client.release();
   }
 };
 
-
 // ============================================================
 // GET ALL FG INVENTORY
 // ============================================================
-
 
 export const getFGInventoryService = async () => {
   try {
@@ -337,6 +319,7 @@ export const getFGInventoryService = async () => {
               'customer', so.customer,
 
               'reservedQty', r.reserved_qty_meter,
+              'requestedQty', r.requested_qty_meter,
               'dispatchedQty', r.dispatched_qty_meter,
               'remainingQty', r.remaining_reserved_qty_meter,
               'releasedQty', r.released_qty_meter,
@@ -367,21 +350,16 @@ export const getFGInventoryService = async () => {
     const { rows } = await pool.query(query);
 
     return rows;
-
   } catch (error) {
     console.error("getFGInventoryService Error:", error);
     throw error;
   }
 };
 
-
 // ============================================================
 // UPDATE FG STOCK
 // ============================================================
-export const updateFGInventoryService = async ({
-  sku,
-  newFGQty,
-}) => {
+export const updateFGInventoryService = async ({ sku, newFGQty }) => {
   const client = await pool.connect();
 
   try {
@@ -410,15 +388,12 @@ export const updateFGInventoryService = async ({
     const { rows } = await client.query(selectQuery, [sku]);
 
     if (!rows.length) {
-      throw new Error(
-        `SKU "${sku}" not found in FG Inventory`
-      );
+      throw new Error(`SKU "${sku}" not found in FG Inventory`);
     }
 
     const fg = rows[0];
 
-    const oldFGQty =
-      Number(fg.available_qty_meter) || 0;
+    const oldFGQty = Number(fg.available_qty_meter) || 0;
 
     // --------------------------------------------------------
     // Same quantity
@@ -456,10 +431,10 @@ export const updateFGInventoryService = async ({
         updated_at AS "updatedAt"
     `;
 
-    const { rows: updatedRows } = await client.query(
-      updateQuery,
-      [quantity, fg.id]
-    );
+    const { rows: updatedRows } = await client.query(updateQuery, [
+      quantity,
+      fg.id,
+    ]);
 
     await client.query("COMMIT");
 
@@ -469,14 +444,12 @@ export const updateFGInventoryService = async ({
       newFGQty: quantity,
       changed: true,
     };
-
   } catch (error) {
     await client.query("ROLLBACK");
 
     console.error("updateFGInventoryService Error:", error);
 
     throw error;
-
   } finally {
     client.release();
   }
@@ -490,58 +463,98 @@ export const reserveFinishedGoodsStock = async ({
   quantity,
   skuCode,
 }) => {
-  const reserveQty = Number(quantity);
+  const requestedQty = Number(quantity);
 
   if (
     !salesItemId ||
     !finishedGoodsId ||
-    !Number.isFinite(reserveQty) ||
-    reserveQty <= 0
+    !Number.isFinite(requestedQty) ||
+    requestedQty <= 0
   ) {
-    throw new Error(
-      `Invalid FG reservation data for SKU: ${skuCode}`
-    );
+    throw new Error(`Invalid FG reservation data for SKU: ${skuCode}`);
   }
 
-  // Reserve free stock and update aggregate FG stock.
-  const updateResult = await client.query(
+  // 1. Lock FG row and read actual free stock
+  const stockResult = await client.query(
     `
-      UPDATE finished_goods
-      SET
-        available_qty_meter = available_qty_meter - $1,
-        reserved_qty_meter = reserved_qty_meter + $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-        AND available_qty_meter >= $1
-      RETURNING id
+      SELECT
+        id,
+        COALESCE(available_qty_meter, 0) AS available_qty_meter
+      FROM finished_goods
+      WHERE id = $1
+      FOR UPDATE
     `,
-    [reserveQty, finishedGoodsId]
+    [finishedGoodsId],
   );
 
-  if (updateResult.rowCount !== 1) {
-    throw new Error(
-      `Insufficient FG stock for reservation: ${skuCode}`
-    );
+  if (stockResult.rowCount !== 1) {
+    throw new Error(`Finished goods not found for SKU: ${skuCode}`);
   }
 
-  // Create order-specific reservation.
+  const availableQty = Math.max(
+    Number(stockResult.rows[0].available_qty_meter),
+    0,
+  );
+
+  // 2. Allocate only available stock
+  const allocatedQty = Math.min(availableQty, requestedQty);
+
+  // 3. Move allocated stock from available to reserved
+  if (allocatedQty > 0) {
+    const updateResult = await client.query(
+      `
+        UPDATE finished_goods
+        SET
+          available_qty_meter = available_qty_meter - $1,
+          reserved_qty_meter =
+            COALESCE(reserved_qty_meter, 0) + $1,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+          AND available_qty_meter >= $1
+        RETURNING id
+      `,
+      [allocatedQty, finishedGoodsId],
+    );
+
+    if (updateResult.rowCount !== 1) {
+      throw new Error(`FG stock allocation failed for SKU: ${skuCode}`);
+    }
+  }
+
+  // 4. Always create one reservation row
   const reservationResult = await client.query(
     `
       INSERT INTO fg_stock_reservations (
         sales_item_id,
         finished_goods_id,
-        reserved_qty_meter
+        requested_qty_meter,
+        reserved_qty_meter,
+        dispatched_qty_meter,
+        released_qty_meter,
+        status
       )
-      VALUES ($1, $2, $3)
-      RETURNING id
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        0,
+        0,
+        CASE
+          WHEN $4::NUMERIC = 0::NUMERIC 
+          THEN 'WAITING_FOR_STOCK'
+          ELSE 'RESERVED'
+        END
+      )
+      RETURNING *
     `,
-    [salesItemId, finishedGoodsId, reserveQty]
+    [salesItemId, finishedGoodsId, requestedQty, allocatedQty],
   );
 
   return {
-    reservationId: reservationResult.rows[0].id,
-    reservedQty: reserveQty,
+    reservation: reservationResult.rows[0],
+    requestedQty,
+    reservedQty: allocatedQty,
+    waitingQty: requestedQty - allocatedQty,
   };
 };
-
-

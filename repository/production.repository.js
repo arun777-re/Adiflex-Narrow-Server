@@ -73,7 +73,7 @@ export const updateCurrentStage = async (
     pendingInputQty,
     status,
     updatedBy,
-    actualQtyAtPacking = 0
+    actualQtyAtPacking = 0,
   },
 ) => {
   return client.query(
@@ -104,21 +104,14 @@ export const updateCurrentStage = async (
       actualQtyAtPacking,
       status,
       updatedBy,
-      stageId
+      stageId,
     ],
   );
 };
 
 export const updateNextStage = async (
   client,
-  {
-    stageId,
-    acceptedQty,
-    remainingQty,
-    pendingInputQty,
-    status,
-    updatedBy,
-  },
+  { stageId, acceptedQty, remainingQty, pendingInputQty, status, updatedBy },
 ) => {
   return client.query(
     `
@@ -132,21 +125,13 @@ export const updateNextStage = async (
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $6
     `,
-    [
-      acceptedQty,
-      remainingQty,
-      pendingInputQty,
-      status,
-      updatedBy,
-      stageId,
-    ],
+    [acceptedQty, remainingQty, pendingInputQty, status, updatedBy, stageId],
   );
 };
 
-
 export const addPackedProductionTotal = async (
   client,
-  { productionId, salesOrderId, actualQty,sku_code }
+  { productionId, salesOrderId, actualQty, sku_code },
 ) => {
   const qty = Number(actualQty);
 
@@ -154,7 +139,7 @@ export const addPackedProductionTotal = async (
     throw new Error("Invalid actual packed quantity");
   }
 
-  // 1. Add only the newly packed quantity to this cycle.
+  // 1. Update production cycle packed total.
   const productionResult = await client.query(
     `
       UPDATE production_master
@@ -165,43 +150,206 @@ export const addPackedProductionTotal = async (
       WHERE id = $1
       RETURNING id, total_production_qty
     `,
-    [productionId, qty]
+    [productionId, qty],
   );
 
   if (productionResult.rowCount !== 1) {
     throw new Error("Production cycle not found while updating packed total");
   }
 
-  console.log("sales_id",salesOrderId)
-
-  // 2. Add the same newly packed quantity to the parent sales order.
-  const salesOrderResult = await client.query(
+  // 2. Update the matching Sales Item.
+  const salesItemResult = await client.query(
     `
       UPDATE sales_items
       SET
         manufactured_qty =
           COALESCE(manufactured_qty, 0) + $2,
         updated_at = CURRENT_TIMESTAMP
-      WHERE sales_order_id = $1 AND sku_code = $3
+      WHERE sales_order_id = $1
+        AND sku_code = $3
       RETURNING id, sku_code, manufactured_qty
     `,
-    [salesOrderId, qty,sku_code]
+    [salesOrderId, qty, sku_code],
   );
 
-  if (salesOrderResult.rowCount !== 1) {
-    throw new Error("Sales order not found while updating manufactured total");
+  if (salesItemResult.rowCount !== 1) {
+    throw new Error(
+      `Expected one Sales Item for SKU ${sku_code}, found ${salesItemResult.rowCount}`,
+    );
+  }
+
+  const salesItemId = salesItemResult.rows[0].id;
+
+  // 3. Get order type.
+  const orderResult = await client.query(
+    `
+      SELECT order_type
+      FROM sales_orders
+      WHERE id = $1
+    `,
+    [salesOrderId],
+  );
+
+  if (orderResult.rowCount !== 1) {
+    throw new Error("Sales order not found while updating FG stock");
+  }
+
+  const orderType = String(orderResult.rows[0].order_type || "").toUpperCase();
+
+  // 4. Lock the matching Finished Goods row.
+  const fgResult = await client.query(
+    `
+      SELECT
+        id,
+        sku_code,
+        COALESCE(available_qty_meter, 0) AS available_qty_meter,
+        COALESCE(reserved_qty_meter, 0) AS reserved_qty_meter
+      FROM finished_goods
+      WHERE sku_code = $1
+      FOR UPDATE
+    `,
+    [sku_code],
+  );
+
+  if (fgResult.rowCount !== 1) {
+    throw new Error(
+      `Expected one Finished Goods row for SKU ${sku_code}, found ${fgResult.rowCount}`,
+    );
+  }
+
+  const finishedGoods = fgResult.rows[0];
+
+  // 5. Add actual packed quantity to free FG stock.
+  const fgUpdateResult = await client.query(
+    `
+      UPDATE finished_goods
+      SET
+        available_qty_meter =
+          COALESCE(available_qty_meter, 0) + $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING id, available_qty_meter, reserved_qty_meter
+    `,
+    [finishedGoods.id, qty],
+  );
+
+  let allocatedQty = 0;
+  let waitingQty = 0;
+
+  // 6. CUSTOMER orders: allocate stock to the EXISTING reservation.
+  if (orderType === "CUSTOMER") {
+    const reservationResult = await client.query(
+      `
+        SELECT
+          id,
+          sales_item_id,
+          finished_goods_id,
+          requested_qty_meter,
+          reserved_qty_meter,
+          dispatched_qty_meter,
+          released_qty_meter,
+          status
+        FROM fg_stock_reservations
+        WHERE sales_item_id = $1
+        FOR UPDATE
+      `,
+      [salesItemId],
+    );
+
+    if (reservationResult.rowCount !== 1) {
+      throw new Error(
+        `Expected one existing FG reservation for Sales Item ${salesItemId}, found ${reservationResult.rowCount}`,
+      );
+    }
+
+    const reservation = reservationResult.rows[0];
+
+    if (Number(reservation.finished_goods_id) !== Number(finishedGoods.id)) {
+      throw new Error(`Reservation FG mismatch for SKU ${sku_code}`);
+    }
+
+    const requestedQty = Number(reservation.requested_qty_meter);
+    const alreadyReserved = Number(reservation.reserved_qty_meter || 0);
+    const alreadyDispatched = Number(reservation.dispatched_qty_meter || 0);
+    const alreadyReleased = Number(reservation.released_qty_meter || 0);
+
+    const pendingDemand = Math.max(0, requestedQty - alreadyReserved);
+
+    const availableStock = Math.max(
+      0,
+      Number(fgUpdateResult.rows[0].available_qty_meter),
+    );
+
+    // Allocate only this Sales Item's pending demand.
+    allocatedQty = Math.min(availableStock, pendingDemand);
+
+    waitingQty = pendingDemand - allocatedQty;
+
+    if (allocatedQty > 0) {
+      // Move allocated quantity from available to reserved FG.
+      const allocateStockResult = await client.query(
+        `
+          UPDATE finished_goods
+          SET
+            available_qty_meter =
+              available_qty_meter - $2::NUMERIC,
+            reserved_qty_meter =
+              COALESCE(reserved_qty_meter, 0) + $2::NUMERIC,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+            AND available_qty_meter >= $2::NUMERIC
+          RETURNING id
+        `,
+        [finishedGoods.id, allocatedQty],
+      );
+
+      if (allocateStockResult.rowCount !== 1) {
+        throw new Error(`FG reservation allocation failed for SKU ${sku_code}`);
+      }
+
+      // Update the existing reservation. Do NOT insert another row.
+      const newReservedQty = alreadyReserved + allocatedQty;
+
+      const newStatus =
+        alreadyDispatched > 0 ? "PARTIALLY_DISPATCHED" : "RESERVED";
+
+      await client.query(
+        `
+          UPDATE fg_stock_reservations
+          SET
+            reserved_qty_meter = $2::NUMERIC,
+            status = $3,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+        `,
+        [reservation.id, newReservedQty, newStatus],
+      );
+    } else {
+      waitingQty = pendingDemand;
+    }
+
+    console.log("FG RESERVATION ALLOCATION:", {
+      salesItemId,
+      skuCode: sku_code,
+      requestedQty,
+      alreadyReserved,
+      newlyAllocated: allocatedQty,
+      waitingQty,
+    });
   }
 
   return {
     cycleTotal: productionResult.rows[0].total_production_qty,
-    salesOrderTotal: salesOrderResult.rows[0].manufactured_qty,
+    salesOrderTotal: salesItemResult.rows[0].manufactured_qty,
+    finishedGoodsId: finishedGoods.id,
+    packedQtyAddedToFG: qty,
+    newlyReservedQty: allocatedQty,
+    waitingQty,
+    orderType,
   };
 };
 
-
-
-
-  export const findProductionIdentity = (client, productionId) =>
+export const findProductionIdentity = (client, productionId) =>
   client.query(
     `
       SELECT id, so_no, sku_code
@@ -218,7 +366,6 @@ export const lockSalesOrderSku = (client, soNo, skuCode) =>
     `,
     [soNo, skuCode],
   );
-
 
 export const findProductionForUpdate = (client, productionId) =>
   client.query(
@@ -253,7 +400,6 @@ export const findProductionForUpdate = (client, productionId) =>
     [productionId],
   );
 
-
 export const findTotalTarget = (client, soNo, skuCode) =>
   client.query(
     `
@@ -263,7 +409,6 @@ export const findTotalTarget = (client, soNo, skuCode) =>
     `,
     [soNo, skuCode],
   );
-
 
 export const findStagesForUpdate = (client, productionId) =>
   client.query(
@@ -282,8 +427,6 @@ export const findStagesForUpdate = (client, productionId) =>
     [productionId],
   );
 
-
-
 export const findAllocatedQuantity = (client, soNo, skuCode) =>
   client.query(
     `
@@ -297,7 +440,6 @@ export const findAllocatedQuantity = (client, soNo, skuCode) =>
     `,
     [soNo, skuCode],
   );
-
 
 export const updateAllStagesQuantity = (
   client,
@@ -315,12 +457,7 @@ export const updateAllStagesQuantity = (
     [inputQty, updatedBy, productionId],
   );
 
-
-
-export const startStageById = (
-  client,
-  { stageId, inputQty, updatedBy },
-) =>
+export const startStageById = (client, { stageId, inputQty, updatedBy }) =>
   client.query(
     `
       UPDATE production_stage_runs
@@ -334,7 +471,6 @@ export const startStageById = (
     `,
     [inputQty, updatedBy, stageId],
   );
-
 
 export const markProductionInProgress = (client, productionId) =>
   client.query(
@@ -356,7 +492,6 @@ export const findActualQuantity = (client, soNo, skuCode) =>
     `,
     [soNo, skuCode],
   );
-
 
 export const updateOrderQuantities = (
   client,
@@ -382,12 +517,7 @@ export const updateOrderQuantities = (
     [soNo, skuCode],
   );
 
-
-
-export const findPendingCycle = (
-  client,
-  { soNo, skuCode, excludeId },
-) =>
+export const findPendingCycle = (client, { soNo, skuCode, excludeId }) =>
   client.query(
     `
       SELECT
@@ -406,7 +536,6 @@ export const findPendingCycle = (
     [soNo, skuCode, excludeId],
   );
 
-
 export const findCycleIds = (client, soNo, skuCode) =>
   client.query(
     `
@@ -417,12 +546,11 @@ export const findCycleIds = (client, soNo, skuCode) =>
     [soNo, skuCode],
   );
 
-
 export const insertProductionCycle = (
   client,
   { production, nextCycleId, totalTarget, remainingQty },
 ) => {
-  console.log("production",production)
+  console.log("production", production);
   if (!production?.sales_order_id) {
     throw new Error(
       `Cannot create next cycle: sales_order_id missing for SO ${production?.so_no}`,
@@ -474,8 +602,6 @@ export const insertProductionCycle = (
   );
 };
 
-
-
 export const insertCycleStages = async (
   client,
   { productionId, allStages },
@@ -498,17 +624,15 @@ export const insertCycleStages = async (
   }
 };
 
-
-
 export const updateWastageToTheSalesOrder = async (
   client,
-  { newWastageQty, production }
+  { newWastageQty, production },
 ) => {
   console.log(
     "SKU code:",
     production.sku_code,
     "Sales Order ID:",
-    production.sales_order_id
+    production.sales_order_id,
   );
 
   const result = await client.query(
@@ -525,11 +649,8 @@ export const updateWastageToTheSalesOrder = async (
       Number(newWastageQty),
       Number(production.sales_order_id),
       production.sku_code,
-    ]
+    ],
   );
 
   return result;
 };
-
-
-
