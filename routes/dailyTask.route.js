@@ -31,7 +31,8 @@ router.delete("/delete/:taskId",authMiddleware,requireAdmin,deleteTask);
 router.get('/employee-gettasks',authMiddleware,getTasksByUserId);
 router.post('/complete-task',authMiddleware,completeDailyTask);
 
-router.get('/get-score',authMiddleware,authMiddleware,getPerformanceOfEmployee)
+router.get('/get-score',authMiddleware,requireAdmin,getPerformanceOfEmployee);
+router.get('/all-employee-performance',authMiddleware,requireAdmin,getPerformanceOfEmployee);
 
 
 export default router;

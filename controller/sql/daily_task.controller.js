@@ -1,7 +1,7 @@
 import { sendResponse } from "../../helpers/sql/global.helper.js";
 import pool from "../../config/postgresDB.js";
 import { DAILY_TASKS_TYPES } from "../../constants/dailyTask.constant.js";
-import { createTaskService } from "../../services/sql/daily_task.service.js";
+import { createTaskService, getAllEmployeesPerformanceService } from "../../services/sql/daily_task.service.js";
 
 export const createTask = async (req, res) => {
   try {
@@ -643,3 +643,71 @@ console.error("Get active delegation tasks error:", err);
     });
   }
   }
+
+
+export const getAllEmployeesPerformance = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // DATE VALIDATION
+    if (!startDate || !endDate) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        message: "startDate and endDate are required",
+      });
+    }
+
+    const isValidDate = (date) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return false;
+      }
+
+      const parsed = new Date(`${date}T00:00:00Z`);
+
+      return (
+        !Number.isNaN(parsed.getTime()) &&
+        parsed.toISOString().slice(0, 10) === date
+      );
+    };
+
+    if (!isValidDate(startDate) || !isValidDate(endDate)) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        message: "Invalid date format. Use YYYY-MM-DD",
+      });
+    }
+
+    if (startDate > endDate) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        message: "Start date cannot be after end date",
+      });
+    }
+
+    // FETCH ALL EMPLOYEES PERFORMANCE
+    const data = await getAllEmployeesPerformanceService({
+      startDate,
+      endDate,
+    });
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      message: "All employees performance fetched successfully",
+      data,
+    });
+  } catch (error) {
+    console.error("Get all employees performance error:", error);
+
+    return sendResponse({
+      res,
+      statusCode: 500,
+      message:
+        error.message ||
+        "Internal server error while fetching all employees performance",
+    });
+  }
+};
