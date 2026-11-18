@@ -1,80 +1,109 @@
 import { getIO } from "../socket/socket.js";
-import { appendNotification } from "../services/notificationSheet.js";
 import { sendWebPushNotification } from "../services/pushNotificationService.js";
+import pool from "../config/postgresDB.js";
 
 export const sendNotification = async ({
-  userID,
-  role,
-  division,
+  userID = null,
+  role = null,
+  division = null,
   type,
   title,
   message,
   reference = "",
 }) => {
   try {
-    // ==========================================
-    // CREATE NOTIFICATION
-    // ==========================================
+    // =====================================================
+    // 1. SAVE NOTIFICATION IN POSTGRESQL
+    // =====================================================
 
-    const notification = {
-      userID,
-      role,
-      division,
+    const query = `
+      INSERT INTO notifications (
+        user_id,
+        role,
+        division,
+        type,
+        title,
+        message,
+        reference,
+        is_read,
+        read_at,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, NULL, NOW())
+      RETURNING
+        id,
+        user_id,
+        role,
+        division,
+        type,
+        title,
+        message,
+        reference,
+        is_read,
+        read_at,
+        created_at
+    `;
+
+    const result = await pool.query(query, [
+      userID || null,
+      role || null,
+      division || null,
       type,
       title,
       message,
-      reference,
-      read: false,
-      readAt: null,
-      createdAt: new Date().toISOString(),
+      reference || "",
+    ]);
+
+    const savedNotification = result.rows[0];
+
+    // Frontend-compatible notification object
+    const notification = {
+      id: savedNotification.id,
+      userID: savedNotification.user_id,
+      role: savedNotification.role,
+      division: savedNotification.division,
+      type: savedNotification.type,
+      title: savedNotification.title,
+      message: savedNotification.message,
+      reference: savedNotification.reference,
+      read: savedNotification.is_read,
+      readAt: savedNotification.read_at,
+      createdAt: savedNotification.created_at,
     };
 
-    // ==========================================
-    // SAVE IN GOOGLE SHEET
-    // ==========================================
+    console.log("✅ Notification saved in PostgreSQL:", notification.id);
 
-    await appendNotification(notification);
+    // =====================================================
+    // 2. REALTIME SOCKET NOTIFICATION
+    // =====================================================
 
-    // ==========================================
-    // SEND REALTIME SOCKET NOTIFICATION
-    // ==========================================
+    try {
+      const io = getIO();
 
-    const io = getIO();
+      if (io && userID) {
+        io.to(`user:${userID}`).emit("new-notification", notification);
 
-    if (io && userID) {
-      const room = `user:${userID}`;
-
-      console.log("📡 EMIT ROOM:", room);
-
-      io.to(room).emit(
-        "new-notification",
-        notification
-      );
-
-      console.log(
-        `✅ Notification sent to ${userID}`
-      );
+        console.log(`✅ Socket notification sent to ${userID}`);
+      }
+    } catch (error) {
+      console.error("Socket notification failed:", error.message);
     }
 
-    // ==========================================
-    // WEB PUSH
-    // ==========================================
+    // =====================================================
+    // 3. WEB PUSH NOTIFICATION
+    // =====================================================
 
-    await sendWebPushNotification(notification);
+    try {
+      await sendWebPushNotification(notification);
 
-    console.log("📡 Notification completed:", {
-      userID,
-      type,
-    });
+      console.log("✅ Web push notification completed");
+    } catch (error) {
+      console.error("Web push notification failed:", error.message);
+    }
 
     return notification;
-
   } catch (error) {
-    console.error(
-      "sendNotification error:",
-      error
-    );
-
+    console.error("sendNotification error:", error);
     throw error;
   }
 };

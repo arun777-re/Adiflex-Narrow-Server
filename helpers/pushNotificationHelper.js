@@ -1,215 +1,135 @@
 
-import sheets from "../config/db.js";
-
-import {
-  USER_COLUMNS,
-  SUBSCRIPTION_COLUMNS,
-} from "../constants/userColumns.js";
-import { SHEET_NAMES } from "../constants/sheetNames.js";
-
-
+import pool from '../config/postgresDB.js'
 // =====================================================
-// GET PUSH SUBSCRIPTIONS
+// GET ALL PUSH SUBSCRIPTIONS
 // =====================================================
 
 export const getPushSubscriptions = async () => {
-  const response =
-    await sheets.spreadsheets.values.get({
-      spreadsheetId:
-        process.env.GOOGLE_SHEET_ID,
+  const result = await pool.query(`
+    SELECT
+      id,
+      subscription_id,
+      user_id,
+      user_name,
+      role,
+      division,
+      endpoint,
+      p256dh,
+      auth,
+      device_name,
+      ip_address,
+      created_at,
+      updated_at,
+      status
+    FROM push_subscriptions
+    ORDER BY id DESC
+  `);
 
-      range:
-        `${SHEET_NAMES.PUSH_SHEET}!A:M`,
-    });
-
-  return response.data.values || [];
+  return result.rows;
 };
-
-
-
-
 
 // =====================================================
 // FIND USER
 // =====================================================
 
 export const findUserById = async (userId) => {
-  const rows = await getUsers();
-
-  const rowIndex = rows.findIndex(
-    (row, index) =>
-      index > 0 &&
-      String(
-        row[USER_COLUMNS.USER_ID] || ""
-      ).trim() === String(userId).trim()
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        user_id,
+        name,
+        role,
+        division,
+        is_active
+      FROM users
+      WHERE LOWER(TRIM(user_id)) = LOWER(TRIM($1))
+      LIMIT 1
+    `,
+    [userId]
   );
 
-  if (rowIndex === -1) {
+  if (!result.rows.length) {
     return null;
   }
 
+  const user = result.rows[0];
+
   return {
-    row: rows[rowIndex],
-    rowIndex,
-    userId:
-      rows[rowIndex][USER_COLUMNS.USER_ID],
-
-    name:
-      rows[rowIndex][USER_COLUMNS.NAME],
-
-    role:
-      rows[rowIndex][USER_COLUMNS.ROLE],
-
-    division:
-      rows[rowIndex][USER_COLUMNS.DIVISION],
-
-    status:
-      rows[rowIndex][USER_COLUMNS.STATUS],
+    row: user,
+    userId: user.user_id,
+    name: user.name,
+    role: user.role,
+    division: user.division,
+    status: user.is_active ? "ACTIVE" : "INACTIVE",
   };
 };
-
 
 // =====================================================
 // FIND SUBSCRIPTION BY ENDPOINT
 // =====================================================
 
-export const findSubscriptionByEndpoint = async (
-  endpoint
-) => {
-  const rows = await getPushSubscriptions();
-
-  const rowIndex = rows.findIndex(
-    (row, index) =>
-      index > 0 &&
-      String(
-        row[
-          SUBSCRIPTION_COLUMNS.ENDPOINT
-        ] || ""
-      ).trim() === String(endpoint).trim()
+export const findSubscriptionByEndpoint = async (endpoint) => {
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM push_subscriptions
+      WHERE endpoint = $1
+      LIMIT 1
+    `,
+    [endpoint]
   );
 
-  if (rowIndex === -1) {
-    return null;
-  }
-
-  return {
-    row: rows[rowIndex],
-    rowIndex,
-  };
+  return result.rows[0] || null;
 };
-
 
 // =====================================================
 // GET SUBSCRIPTIONS FOR USER
 // =====================================================
 
 export const getUserPushSubscriptions = async (userId) => {
-  const rows = await getPushSubscriptions();
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM push_subscriptions
+      WHERE LOWER(TRIM(user_id)) = LOWER(TRIM($1))
+        AND UPPER(status) = 'ACTIVE'
+        AND endpoint IS NOT NULL
+        AND p256dh IS NOT NULL
+        AND auth IS NOT NULL
+        AND endpoint <> ''
+        AND p256dh <> ''
+        AND auth <> ''
+      ORDER BY id DESC
+    `,
+    [userId]
+  );
 
-  const normalizedUserId = String(userId || "").trim();
-
-  return rows.slice(1).filter((row) => {
-    const rowUserId = String(
-      row[SUBSCRIPTION_COLUMNS.USER_ID] || ""
-    ).trim();
-
-    const status = String(
-      row[SUBSCRIPTION_COLUMNS.STATUS] || ""
-    ).trim().toUpperCase();
-
-    const endpoint = String(
-      row[SUBSCRIPTION_COLUMNS.ENDPOINT] || ""
-    ).trim();
-
-    const p256dh = String(
-      row[SUBSCRIPTION_COLUMNS.P256DH] || ""
-    ).trim();
-
-    const auth = String(
-      row[SUBSCRIPTION_COLUMNS.AUTH] || ""
-    ).trim();
-
-    return (
-      rowUserId === normalizedUserId &&
-      status === "ACTIVE" &&
-      endpoint &&
-      p256dh &&
-      auth
-    );
-  });
+  return result.rows;
 };
-
 
 // =====================================================
 // GET SUBSCRIPTIONS FOR ROLE + DIVISION
 // =====================================================
 
-export const getSubscriptionsForNotification =
-  async ({
-    role,
-    division,
-  }) => {
+export const getSubscriptionsForNotification = async ({
+  role,
+  division,
+}) => {
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM push_subscriptions
+      WHERE LOWER(TRIM(role)) = LOWER(TRIM($1))
+        AND UPPER(status) = 'ACTIVE'
+        AND (
+          LOWER(TRIM(division)) = 'all'
+          OR LOWER(TRIM(division)) = LOWER(TRIM($2))
+        )
+      ORDER BY id DESC
+    `,
+    [role, division]
+  );
 
-    const rows =
-      await getPushSubscriptions();
-
-    const normalizedRole =
-      String(role || "")
-        .trim()
-        .toLowerCase();
-
-    const normalizedDivision =
-      String(division || "")
-        .trim()
-        .toLowerCase();
-
-    return rows
-      .slice(1)
-      .filter((row) => {
-
-        const rowRole =
-          String(
-            row[
-              SUBSCRIPTION_COLUMNS.ROLE
-            ] || ""
-          )
-            .trim()
-            .toLowerCase();
-
-        const rowDivision =
-          String(
-            row[
-              SUBSCRIPTION_COLUMNS.DIVISION
-            ] || ""
-          )
-            .trim()
-            .toLowerCase();
-
-        const status =
-          String(
-            row[
-              SUBSCRIPTION_COLUMNS.STATUS
-            ] || ""
-          )
-            .trim()
-            .toUpperCase();
-
-        if (status !== "ACTIVE") {
-          return false;
-        }
-
-        if (rowRole !== normalizedRole) {
-          return false;
-        }
-
-        // all division
-        if (rowDivision === "all") {
-          return true;
-        }
-
-        return (
-          rowDivision ===
-          normalizedDivision
-        );
-      });
-  };
+  return result.rows;
+};
