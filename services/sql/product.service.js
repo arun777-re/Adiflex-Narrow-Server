@@ -25,6 +25,13 @@ export const createProductService = async (data) => {
     );
   }
 
+  const numericSize = Number(size);
+
+  if(!Number.isFinite(numericSize) || numericSize <= 0){
+    throw new Error("Invalid Product size");
+  }
+
+  const sizeInMM = `${numericSize}mm`
 
 
 //   generate sku
@@ -63,7 +70,7 @@ const sku_code = await generateSKUCode(division);
     sku_code,
     productName,
     division,
-    size,
+    sizeInMM,
     color || null,
     Number(rate) || 0,
     basicUnit,
