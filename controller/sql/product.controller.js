@@ -108,12 +108,10 @@ export const getProductBySku = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { sku } = req.params;
-
     const product = await updateProductService({
       sku,
       ...req.body,
     });
-
     return sendResponse({
       res,
       statusCode: 200,

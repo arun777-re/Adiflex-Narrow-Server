@@ -168,9 +168,8 @@ export const updateProductService = async (data) => {
     rate,
     basicUnit,
     meterPerRoll,
-    meterPerKg,
+    meterPerKG,
   } = data;
-
   const query = `
     UPDATE product_master
     SET
@@ -211,8 +210,8 @@ export const updateProductService = async (data) => {
     meterPerRoll !== undefined
       ? Number(meterPerRoll)
       : null,
-    meterPerKg !== undefined
-      ? Number(meterPerKg)
+    meterPerKG !== undefined
+      ? Number(meterPerKG)
       : null,
   ];
 
