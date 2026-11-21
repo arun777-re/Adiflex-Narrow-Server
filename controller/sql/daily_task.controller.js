@@ -121,8 +121,9 @@ export const deleteTask = async (req, res) => {
 
 export const updateTask = async (req, res) => {
   try {
-    const { task_id } = req.params;
-    if (!task_id) {
+    const { taskId } = req.params;
+    console.log("task id",req.body,"query............",req.query)
+    if (!taskId) {
       return sendResponse({
         res,
         statusCode: 400,
@@ -151,7 +152,7 @@ export const updateTask = async (req, res) => {
       department,
       task_type,
       due_date,
-      task_id,
+      taskId,
     ]);
 
     if (result.rowCount === 0) {
